@@ -24,7 +24,44 @@ data and the methods’ advantages and limitations; – present the results
 in a concise way through a presentation; – present the work in a more
 extensive way with a report.
 
+Question setup:
+We are aliens who are looking at Earth. We have a vague understanding that the territory is separated by geographical regions, countries and continents, and each has a choice on how to run its own territory. We land in a determined region and want to see how to improve it.
+
+First of all: 
+determine how to evaluate a country: (outcome variables)
+- infant mortality rate
+- maternal mortality rate
+- life expectancy at birth
+- air pollution death rate
+- crude suicide rates (??)
+- incidents of malaria
+- incidents of tuberculosis
+- poisoning mortality rate (??)
+- neonatal mortality rate
+- new HIV infections (??)
+- road traffic deaths
+- under 5 mortality rate
+
+determine what a country can change to influence the above outcomes: (decision variables)
+- number of doctors
+- number of dentists
+- number of pharmacists
+- basic drinking water services
+- least basic sanitation services
+- births attended by skilled personnel
+- basic hand washing
+- clean fuel and tech
+- tobacco at age 15 (advertisement) (maybe not this)
+- nursing and midwife numbers
+- usage of sanitation services
+
+
 POTENTAIL QUESTIONS TO BE ANSWERED
+
+Q1. Which are the most impactful features (decision variables) when predicting outcome variables (lin reg)
+Q2. predict classification outcome variables based in decision variables 
+Q3. do this for a specific country/continent (looking at the historic data and all different features)
+Q4. (maybe) clustering by Continent based on important outcome features
 
 Hypothesis: Higher literacy/education levels are associated with better
             health outcomes (e.g., lower infant mortality). 
@@ -47,15 +84,34 @@ Loading data which might seem useful to answer statistical questions
 
 ```{r}
 
+# outcome features
+infant_mortality_rate_data = read_csv("data/infantMortalityRate.csv")
+maternal_mortality_ratio_data = read_csv("data/maternalMortalityRatio.csv")
+life_expectency_at_birth_data = read_csv("data/lifeExpectancyAtBirth.csv")
+incidence_of_malaria_data = read_csv("data/incedenceOfMalaria.csv")
+incidence_of_tuberculosis_data = read_csv("data/incedenceOfTuberculosis.csv")
+crude_sucide_rates = read_csv("data/crudeSuicideRates.csv")
+poison_mortality_rate = read_csv("data/mortalityRatePoisoning.csv")
+neo_natal_mortality_rate = read_csv("data/neonatalMortalityRate.csv")
+new_hiv_infections = read_csv("data/newHivInfections.csv")
+road_traffic_deaths = read_csv("data/roadTrafficDeaths.csv")
+under_5_mortality_rate = read_csv("data/under5MortalityRate.csv")
+# air_pollution_death_rate = read_csv("data/airPollutionDeathRate.csv")   has too many features and is only for 2016
+
+
+# decision features
 medical_doctors_data = read_csv("data/medicalDoctors.csv")
 pharmacists_data = read_csv("data/pharmacists.csv")
 birth_by_skilled_personel_data = read_csv("data/birthAttendedBySkilledPersonal.csv")
-life_expectency_at_birth_data = read_csv("data/lifeExpectancyAtBirth.csv")
-infant_mortality_rate_data = read_csv("data/infantMortalityRate.csv")
+number_of_dentists = read_csv("data/dentists.csv")
+drinking_water_services = read_csv("data/basicDrinkingWaterServices.csv")
+least_basic_sanitation_services = read_csv("data/atLeastBasicSanitizationServices.csv")
+basic_hand_washing = read_csv("data/basicHandWashing.csv")
+clean_fuel_and_teck = read_csv("data/cleanFuelAndTech.csv")
+tabacco_age_15 = read_csv("data/tobaccoAge15.csv")
+nursing_services = read_csv("data/nursingAndMidwife.csv")
+sanitation_services = read_csv("data/safelySanitization.csv")
 
-maternal_mortality_ratio_data = read_csv("data/maternalMortalityRatio.csv")
-incidence_of_malaria_data = read_csv("data/incedenceOfMalaria.csv")
-incidence_of_tuberculosis_data = read_csv("data/incedenceOfTuberculosis.csv")
 
 head(medical_doctors_data, 5)
 ```
@@ -79,23 +135,243 @@ replace_inidcator_to_tooltip = function(tibble) {
 # pipelining each data set through data modifications it needs to become tidy
 medical_doctors_data = medical_doctors_data |> replace_inidcator_to_tooltip()
 birth_by_skilled_personel_data = birth_by_skilled_personel_data |> replace_inidcator_to_tooltip()
-life_expectency_at_birth_data = life_expectency_at_birth_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Life expectancy at birth (years)`)
+life_expectency_at_birth_data = life_expectency_at_birth_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from=`Life expectancy at birth (years)`)
 pharmacists_data = pharmacists_data |> replace_inidcator_to_tooltip()
-infant_mortality_rate_data = infant_mortality_rate_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)`) |> mutate(across(c(`Both sexes`, Male, Female), ~ as.numeric(sub(" .*", "", .x)))) # Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)
-
+infant_mortality_rate_data = infant_mortality_rate_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)`) |> mutate(across(c(`Both sexes`, Male, Female), ~ as.numeric(sub(" .*", "", .x))))
 maternal_mortality_ratio_data = maternal_mortality_ratio_data |> replace_inidcator_to_tooltip() |> mutate(across(`Maternal mortality ratio (per 100 000 live births)`, ~ as.numeric(sub(" .*", "", .x))))
 incidence_of_malaria_data = incidence_of_malaria_data |> replace_inidcator_to_tooltip()
 incidence_of_tuberculosis_data = incidence_of_tuberculosis_data |> replace_inidcator_to_tooltip() |> mutate(across(`Incidence of tuberculosis (per 100 000 population per year)`, ~ as.numeric(sub(" .*", "", .x))))
 
-maternal_mortality_ratio_data
-incidence_of_malaria_data
-incidence_of_tuberculosis_data
-infant_mortality_rate_data
+# air_pollution_death_rate = air_pollution_death_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from = c(Dim1, Dim2), values_from = `First Tooltip`) |> replace_inidcator_to_tooltip()
+
+crude_sucide_rates = crude_sucide_rates |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+poison_mortality_rate = poison_mortality_rate |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+neo_natal_mortality_rate = neo_natal_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> replace_inidcator_to_tooltip() |> select(-c(Dim1))
+new_hiv_infections = new_hiv_infections |> drop_na() |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+road_traffic_deaths = road_traffic_deaths |> replace_inidcator_to_tooltip()
+under_5_mortality_rate = under_5_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+number_of_dentists = number_of_dentists |> replace_inidcator_to_tooltip()
+drinking_water_services = drinking_water_services |> replace_inidcator_to_tooltip()
+least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+basic_hand_washing = basic_hand_washing |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+clean_fuel_and_teck = clean_fuel_and_teck |> replace_inidcator_to_tooltip()
+tabacco_age_15 = tabacco_age_15  |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+nursing_services = nursing_services |> replace_inidcator_to_tooltip()
+sanitation_services = sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+
+
+number_of_dentists
+drinking_water_services
+least_basic_sanitation_services
+basic_hand_washing
+clean_fuel_and_teck
+tabacco_age_15
+nursing_services
+sanitation_services
+under_5_mortality_rate
+road_traffic_deaths
+new_hiv_infections
+neo_natal_mortality_rate
+poison_mortality_rate
+
+crude_sucide_rates
 ```
 
 ```{r}
 
-# merging all the datasets into 1
+# lowest 1962 year
+# highest 2019 year
+
+# creating an empty merged_data so we can add all the features from the datasets
+
+countries = c(
+    "Afghanistan", "Albania", "Algeria", "Angola", "Antigua and Barbuda",
+    "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+    "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus",
+    "Belgium", "Belize", "Benin", "Bhutan", "Bolivia (Plurinational State of)",
+    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei Darussalam",
+    "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia",
+    "Cameroon", "Canada", "Central African Republic", "Chad", "Chile",
+    "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia",
+    "Cuba", "Cyprus", "Czechia", "Côte d'Ivoire", "Democratic People's Republic of Korea",
+    "Democratic Republic of the Congo", "Denmark", "Djibouti",
+    "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea",
+    "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland",
+    "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana",
+    "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau",
+    "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India",
+    "Indonesia", "Iran (Islamic Republic of)", "Iraq", "Ireland",
+    "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
+    "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Lao People's Democratic Republic",
+    "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Lithuania",
+    "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives",
+    "Mali", "Malta", "Mauritania", "Mauritius", "Mexico", "Micronesia (Federated States of)",
+    "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+    "Namibia", "Nepal", "Netherlands", "New Zealand", "Nicaragua",
+    "Niger", "Nigeria", "Norway", "Oman", "Pakistan", "Panama",
+    "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland",
+    "Portugal", "Qatar", "Republic of Korea", "Republic of Moldova",
+    "Romania", "Russian Federation", "Rwanda", "Saint Lucia",
+    "Saint Vincent and the Grenadines", "Samoa", "Sao Tome and Principe",
+    "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone",
+    "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia",
+    "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan",
+    "Sudan (until 2011)", "Suriname", "Sweden", "Switzerland",
+    "Syrian Arab Republic", "Tajikistan", "Thailand", "The former Yugoslav Republic of Macedonia",
+    "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia",
+    "Turkey", "Turkmenistan", "Uganda", "Ukraine", "United Arab Emirates",
+    "United Kingdom of Great Britain and Northern Ireland", "United Republic of Tanzania",
+    "United States of America", "Uruguay", "Uzbekistan", "Vanuatu",
+    "Venezuela (Bolivarian Republic of)", "Viet Nam", "Yemen",
+    "Zambia", "Zimbabwe", "Andorra", "Cook Islands", "Dominica",
+    "Marshall Islands", "Nauru", "Niue", "Palau", "Saint Kitts and Nevis",
+    "State of Palestine", "Tuvalu", "Monaco", "San Marino", "Germany, Federal Republic (former)",
+    "India (until 1975)", "Kiribati (until 1984)", "South Viet Nam (former)")
+
+years <- 2019:1962
+
+merged_data = tibble(Location=countries) |> mutate(Period = list(years)) |> unnest(Period)
+
+merged_data
+
+```
+
+
+```{r}
+
+
+merged_data = full_join(merged_data, drinking_water_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, number_of_dentists, by=c("Location", "Period"))
+merged_data = full_join(merged_data, least_basic_sanitation_services |> rename(sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, basic_hand_washing |> rename(basic_hand_washing_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, tabacco_age_15 |> rename(tabacco_age_15=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, nursing_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, sanitation_services |> rename(total_sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, under_5_mortality_rate |> rename(under_5_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, road_traffic_deaths |> mutate(`Estimated road traffic death rate (per 10 000 population)`=`Estimated road traffic death rate (per 100 000 population)`/10) |> select(-c(`Estimated road traffic death rate (per 100 000 population)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, new_hiv_infections |> rename(hiv_infections=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, neo_natal_mortality_rate |> mutate(`Neonatal mortality rate (per 10 000 live births)`=`Neonatal mortality rate (per 1000 live births)`*10) |> select(-c(`Neonatal mortality rate (per 1000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, poison_mortality_rate |> rename(poison_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, crude_sucide_rates |> rename(sucide_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, life_expectency_at_birth_data |> rename(life_expectency_at_birth=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, birth_by_skilled_personel_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, medical_doctors_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, pharmacists_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, infant_mortality_rate_data |> rename(infant_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, maternal_mortality_ratio_data |> mutate(`Maternal mortality ratio (per 10 000 live births)`=`Maternal mortality ratio (per 100 000 live births)`*10) |> select(-c(`Maternal mortality ratio (per 100 000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_malaria_data |> mutate(`Malaria incidence (per 10 000 population at risk)`=`Malaria incidence (per 1 000 population at risk)`*10) |> select(-c(`Malaria incidence (per 1 000 population at risk)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`Incidence of tuberculosis (per 10 000 population per year)`=`Incidence of tuberculosis (per 100 000 population per year)`*10) |> select(-c(`Incidence of tuberculosis (per 100 000 population per year)`)), by=c("Location", "Period"))
+
+
+merged_data
+
+
+
+
+```
+
+
+```{r}
+
+infant_mortality_rate_data_mutated = infant_mortality_rate_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="mortality_rate") |> drop_na()
+
+# logged density of gender infant mortality rate
+infant_mortality_rate_data_mutated |> ggplot() + geom_density(aes(x=log(mortality_rate), fill=gender, alpha=0.75))
+
+infant_mortality_rate_data_mutated_male = infant_mortality_rate_data_mutated |> filter(gender=="Male")
+infant_mortality_rate_data_mutated_female = infant_mortality_rate_data_mutated |> filter(gender=="Female")
+
+mean_m = mean(infant_mortality_rate_data_mutated_male$mortality_rate)
+mean_f = mean(infant_mortality_rate_data_mutated_female$mortality_rate)
+
+std_m = sd(infant_mortality_rate_data_mutated_male$mortality_rate)
+std_f = sd(infant_mortality_rate_data_mutated_female$mortality_rate)
+
+generated_m = rnorm(1000, mean_m, std_m)
+generated_f = rnorm(1000, mean_f, std_f)
+
+ggplot() + geom_density(aes(x=infant_mortality_rate_data_mutated_male$mortality_rate, color="red")) + geom_density(aes(x=generated_m))
+
+ggplot() + geom_density(aes(x=infant_mortality_rate_data_mutated_female$mortality_rate, color="red")) + geom_density(aes(x=generated_f))
+
+# the distributions are not gaussian
+
+```
+
+```{r}
+
+
+life_expectency_at_birth_data_mutated = life_expectency_at_birth_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="life_expectency") |> drop_na()
+
+# logged density of gender infant mortality rate
+life_expectency_at_birth_data_mutated |> ggplot() + geom_density(aes(x=life_expectency, fill=gender, alpha=0.75))
+
+data_mutated_male = life_expectency_at_birth_data_mutated |> filter(gender=="Male")
+data_mutated_female = life_expectency_at_birth_data_mutated |> filter(gender=="Female")
+
+mean_m = mean(data_mutated_male$life_expectency)
+mean_f = mean(data_mutated_female$life_expectency)
+
+std_m = sd(data_mutated_male$life_expectency)
+std_f = sd(data_mutated_female$life_expectency)
+
+generated_m = rnorm(1000, mean_m, std_m)
+generated_f = rnorm(1000, mean_f, std_f)
+
+ggplot() + geom_density(aes(x=data_mutated_male$life_expectency, color="red")) + geom_density(aes(x=generated_m))
+
+ggplot() + geom_density(aes(x=data_mutated_female$life_expectency, color="red")) + geom_density(aes(x=generated_f))
+
+# the distributions are about gaussian
+
+```
+
+
+
+```{r}
+
+# Hypothesis: Female infant mortality is the same to male infant mortality (probability of dying between birth and age 1 per 1000 live births)
+
+# since we are using a bootstrap approach the data doesn't need to be normal
+
+infant_mortality_rate_data_mutated = infant_mortality_rate_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="mortality_rate") |> drop_na()
+
+infant_mortality_rate_data_mutated  = infant_mortality_rate_data_mutated |> mutate(mortality_rate=log(mortality_rate))
+
+infant_mortality_rate_data_mutated |> ggplot() + geom_boxplot(aes(x=gender, y=mortality_rate, fill=gender))
+
+bootstrap_diff_means = infant_mortality_rate_data_mutated |> specify(explanatory=gender, response=mortality_rate) |> hypothesize(null="independence") |> generate(1000, type="bootstrap") |> calculate(stat="diff in means", order=c("Female", "Male"))
+obs_mean = infant_mortality_rate_data_mutated |> specify(explanatory=gender, response=mortality_rate) |> calculate(stat="diff in means", order = c("Female", "Male"))
+CI = bootstrap_diff_means |> get_confidence_interval(point_estimate=obs_mean, level = 0.95)
+
+bootstrap_diff_means |> visualize() + shade_confidence_interval(CI) + geom_vline(xintercept=0) + labs(title="Bootstrap Distribution of Mean Difference (Female - Male)", x="Difference in Mean Infant Mortality Rate")
+
+```
+
+```{r}
+
+# Hypothesis: Female have the same life expectancy at birth to males
+
+life_expectency_at_birth_data_mutated = life_expectency_at_birth_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="life_expectency") |> drop_na()
+
+life_expectency_at_birth_data_mutated |> ggplot() + geom_boxplot(aes(x=gender, y=life_expectency, fill=gender))
+
+bootstrap_diff_means = life_expectency_at_birth_data_mutated |> specify(explanatory=gender, response=life_expectency) |> hypothesize(null="independence") |> generate(1000, type="bootstrap") |> calculate(stat="diff in means", order=c("Female", "Male"))
+obs_mean = life_expectency_at_birth_data_mutated |> specify(explanatory=gender, response=life_expectency) |> calculate(stat="diff in means", order = c("Female", "Male"))
+CI = bootstrap_diff_means |> get_confidence_interval(point_estimate=obs_mean, level = 0.95)
+
+bootstrap_diff_means |> visualize() + shade_confidence_interval(CI) + geom_vline(xintercept=0) + labs(title="Bootstrap Distribution of Mean Difference (Female - Male)", x="Difference in Mean life expectancy at birth")
+
+
+
+```
+
+
+old merged data without the periods and less datasets
+```{r}
+
+# merging all the datasets into 1 taking the mean of all preiods
+# replaced with bigger merged_data 
 
 life_ex = life_expectency_at_birth_data |> group_by(Location) |> summarise(mean_life_expectancy_both_sexes=mean(`Both sexes`))
 doc_at_birth = birth_by_skilled_personel_data |> group_by(Location) |> summarise(mean_doct_at_birth_perc=mean(`Births attended by skilled health personnel (%)`))
@@ -127,51 +403,6 @@ incidence_of_tuberculosis = incidence_of_tuberculosis_data |> group_by(Location)
 merged = full_join(merged, incidence_of_tuberculosis, by="Location")
 
 ```
-
-```{r}
-
-# Hypothesis: Female infant mortality is the same to male infant mortality (probability of dying between birth and age 1 per 1000 live births)
-
-infant_mortality_rate_data_mutated = infant_mortality_rate_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="mortality_rate") |> drop_na()
-
-infant_mortality_rate_data_mutated |> ggplot() + geom_boxplot(aes(x=gender, y=mortality_rate, fill=gender))
-
-bootstrap_diff_means = infant_mortality_rate_data_mutated |> specify(explanatory=gender, response=mortality_rate) |> hypothesize(null="independence") |> generate(1000, type="bootstrap") |> calculate(stat="diff in means", order=c("Female", "Male"))
-obs_mean = infant_mortality_rate_data_mutated |> specify(explanatory=gender, response=mortality_rate) |> calculate(stat="diff in means", order = c("Female", "Male"))
-CI = bootstrap_diff_means |> get_confidence_interval(point_estimate=obs_mean, level = 0.95)
-
-bootstrap_diff_means |> visualize() + shade_confidence_interval(CI) + geom_vline(xintercept=0) + labs(title="Bootstrap Distribution of Mean Difference (Female - Male)", x="Difference in Mean Infant Mortality Rate")
-
-```
-
-```{r}
-
-# Hypothesis: Female have the same life expectancy at birth to males
-
-life_expectency_at_birth_data_mutated = life_expectency_at_birth_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="life_expectency") |> drop_na()
-
-life_expectency_at_birth_data_mutated |> ggplot() + geom_boxplot(aes(x=gender, y=life_expectency, fill=gender))
-
-bootstrap_diff_means = life_expectency_at_birth_data_mutated |> specify(explanatory=gender, response=life_expectency) |> hypothesize(null="independence") |> generate(1000, type="bootstrap") |> calculate(stat="diff in means", order=c("Female", "Male"))
-obs_mean = life_expectency_at_birth_data_mutated |> specify(explanatory=gender, response=life_expectency) |> calculate(stat="diff in means", order = c("Female", "Male"))
-CI = bootstrap_diff_means |> get_confidence_interval(point_estimate=obs_mean, level = 0.95)
-
-bootstrap_diff_means |> visualize() + shade_confidence_interval(CI) + geom_vline(xintercept=0) + labs(title="Bootstrap Distribution of Mean Difference (Female - Male)", x="Difference in Mean life expectancy at birth")
-
-
-
-```
-
-```{r, fig.width=20, fig.height=20}
-
-library(GGally)
-
-ggpairs(merged |> drop_na() |> select(-c(Location)), progress=FALSE)
-
-
-```
-
-
 
 ```{r}
 
@@ -378,16 +609,25 @@ continents <- c(
   "Asia"                 # South Viet Nam (former)
 )
 
-merged = merged |> mutate(continent=continents)
+locations = merged$Location
 
+continents_dict = setNames(continents, locations)
 
+continent_list_for_merged_data = continents_dict[merged_data$Location]
+
+merged_data = merged_data |> mutate(continent=continent_list_for_merged_data)
 ```
 
 
 
 ```{r}
 
-merged
+outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria incidence (per 10 000 population at risk)", "Incidence of tuberculosis (per 10 000 population per year)", "under_5_mortality_rate", "Estimated road traffic death rate (per 10 000 population)", "hiv_infections", "Neonatal mortality rate (per 10 000 live births)", "poison_mortality_rate", "sucide_rate", "life_expectency_at_birth", "infant_mortality_rate")
+
+explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
+
+merged_data_outcome_feat = merged_data |> select(c(Location, Period)) |> bind_cols(merged_data[outcome_feat])
+merged_data_explanatory_feat = merged_data[explanatory_feat]
 
 ```
 
