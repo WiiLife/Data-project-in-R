@@ -13,6 +13,7 @@ library("readr")
 library("dplyr")
 library("tidyverse")
 library("tidymodels")
+library("GGally")
 ```
 
 PROJECT
@@ -625,11 +626,50 @@ merged_data = merged_data |> mutate(continent=continent_list_for_merged_data)
 outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria incidence (per 10 000 population at risk)", "Incidence of tuberculosis (per 10 000 population per year)", "under_5_mortality_rate", "Estimated road traffic death rate (per 10 000 population)", "hiv_infections", "Neonatal mortality rate (per 10 000 live births)", "poison_mortality_rate", "sucide_rate", "life_expectency_at_birth", "infant_mortality_rate")
 
 explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
+explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
 
 merged_data_outcome_feat = merged_data |> select(c(Location, Period)) |> bind_cols(merged_data[outcome_feat])
-merged_data_explanatory_feat = merged_data[explanatory_feat]
+merged_data_explanatory_feat = merged_data |> select(c(Location, Period)) |> bind_cols(merged_data[explanatory_feat])
 
 ```
+
+```{r}
+
+# ggpairs(merged_data_explanatory_feat |> select(-c(Location, Period)), progress=FALSE)
+
+```
+
+
+```{r}
+
+merged_train_test_split = merged_data |> initial_split(prop=0.8)
+
+merged_data_train = training(merged_train_test_split)
+merged_data_test = testing(merged_train_test_split)
+
+```
+
+```{r}
+
+base_recipe = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_normalize(all_numeric_predictors())
+
+base_recipe_imputed = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_impute_mean(all_numeric_predictors()) |> step_normalize(all_numeric_predictors())
+
+```
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
 
 
 
