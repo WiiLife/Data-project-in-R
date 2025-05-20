@@ -33,10 +33,9 @@ We are looking at this data project as aliens who are very logical but not very 
 Our research questions, from more generic to more specific are:
 
 -   What are the best outcomes for a country, and what are the primary influencing features for these outcomes;
-- Using the most influential features found above, can we determine a given country's continent of origin
-- As a country that is not doing well, which features should it improve;
-- binary calssification (phrase better)
-
+-   Using the most influential features found above, can we determine a given country's continent of origin
+-   As a country that is not doing well, which features should it improve;
+-   binary calssification (phrase better)
 
 ### 3.2 Data cleaning
 
@@ -81,7 +80,6 @@ head(medical_doctors_data, 5)
 ```
 
 Note: many features correlate on a given model or prediction, so in many cases we will not use the totality of the data as the information in a given features may not be unique, and is found in other features for a specific use case.
-
 
 ## 4. Experiments and findings
 

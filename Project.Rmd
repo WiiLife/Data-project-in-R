@@ -9,11 +9,16 @@ editor_options:
 Packages
 
 ```{r}
-library("readr")
-library("dplyr")
-library("tidyverse")
-library("tidymodels")
-library("GGally")
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(glmnet)
+library(ranger)
+options(ranger.num.threads = 16)
+library(xgboost)
+library(kknn)
 ```
 
 PROJECT
@@ -131,52 +136,7 @@ replace_inidcator_to_tooltip = function(tibble) {
 
 ```
 
-```{r}
 
-# pipelining each data set through data modifications it needs to become tidy
-medical_doctors_data = medical_doctors_data |> replace_inidcator_to_tooltip()
-birth_by_skilled_personel_data = birth_by_skilled_personel_data |> replace_inidcator_to_tooltip()
-life_expectency_at_birth_data = life_expectency_at_birth_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from=`Life expectancy at birth (years)`)
-pharmacists_data = pharmacists_data |> replace_inidcator_to_tooltip()
-infant_mortality_rate_data = infant_mortality_rate_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)`) |> mutate(across(c(`Both sexes`, Male, Female), ~ as.numeric(sub(" .*", "", .x))))
-maternal_mortality_ratio_data = maternal_mortality_ratio_data |> replace_inidcator_to_tooltip() |> mutate(across(`Maternal mortality ratio (per 100 000 live births)`, ~ as.numeric(sub(" .*", "", .x))))
-incidence_of_malaria_data = incidence_of_malaria_data |> replace_inidcator_to_tooltip()
-incidence_of_tuberculosis_data = incidence_of_tuberculosis_data |> replace_inidcator_to_tooltip() |> mutate(across(`Incidence of tuberculosis (per 100 000 population per year)`, ~ as.numeric(sub(" .*", "", .x))))
-
-# air_pollution_death_rate = air_pollution_death_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from = c(Dim1, Dim2), values_from = `First Tooltip`) |> replace_inidcator_to_tooltip()
-
-crude_sucide_rates = crude_sucide_rates |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-poison_mortality_rate = poison_mortality_rate |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-neo_natal_mortality_rate = neo_natal_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> replace_inidcator_to_tooltip() |> select(-c(Dim1))
-new_hiv_infections = new_hiv_infections |> drop_na() |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-road_traffic_deaths = road_traffic_deaths |> replace_inidcator_to_tooltip()
-under_5_mortality_rate = under_5_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-number_of_dentists = number_of_dentists |> replace_inidcator_to_tooltip()
-drinking_water_services = drinking_water_services |> replace_inidcator_to_tooltip()
-least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-basic_hand_washing = basic_hand_washing |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-clean_fuel_and_teck = clean_fuel_and_teck |> replace_inidcator_to_tooltip()
-tabacco_age_15 = tabacco_age_15  |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-nursing_services = nursing_services |> replace_inidcator_to_tooltip()
-sanitation_services = sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
-
-
-number_of_dentists
-drinking_water_services
-least_basic_sanitation_services
-basic_hand_washing
-clean_fuel_and_teck
-tabacco_age_15
-nursing_services
-sanitation_services
-under_5_mortality_rate
-road_traffic_deaths
-new_hiv_infections
-neo_natal_mortality_rate
-poison_mortality_rate
-
-crude_sucide_rates
-```
 
 ```{r}
 
@@ -237,9 +197,38 @@ merged_data
 
 ```
 
-
 ```{r}
 
+# pipelining each data set through data modifications it needs to become tidy
+medical_doctors_data = medical_doctors_data |> replace_inidcator_to_tooltip()
+birth_by_skilled_personel_data = birth_by_skilled_personel_data |> replace_inidcator_to_tooltip()
+life_expectency_at_birth_data = life_expectency_at_birth_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from=`Life expectancy at birth (years)`)
+pharmacists_data = pharmacists_data |> replace_inidcator_to_tooltip()
+infant_mortality_rate_data = infant_mortality_rate_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)`) |> mutate(across(c(`Both sexes`, Male, Female), ~ as.numeric(sub(" .*", "", .x))))
+maternal_mortality_ratio_data = maternal_mortality_ratio_data |> replace_inidcator_to_tooltip() |> mutate(across(`Maternal mortality ratio (per 100 000 live births)`, ~ as.numeric(sub(" .*", "", .x))))
+incidence_of_malaria_data = incidence_of_malaria_data |> replace_inidcator_to_tooltip()
+incidence_of_tuberculosis_data = incidence_of_tuberculosis_data |> replace_inidcator_to_tooltip() |> mutate(across(`Incidence of tuberculosis (per 100 000 population per year)`, ~ as.numeric(sub(" .*", "", .x))))
+
+# air_pollution_death_rate = air_pollution_death_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from = c(Dim1, Dim2), values_from = `First Tooltip`) |> replace_inidcator_to_tooltip()
+
+crude_sucide_rates = crude_sucide_rates |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+poison_mortality_rate = poison_mortality_rate |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+neo_natal_mortality_rate = neo_natal_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> replace_inidcator_to_tooltip() |> select(-c(Dim1))
+new_hiv_infections = new_hiv_infections |> drop_na() |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+road_traffic_deaths = road_traffic_deaths |> replace_inidcator_to_tooltip()
+under_5_mortality_rate = under_5_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+number_of_dentists = number_of_dentists |> replace_inidcator_to_tooltip()
+drinking_water_services = drinking_water_services |> replace_inidcator_to_tooltip()
+least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+basic_hand_washing = basic_hand_washing |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+clean_fuel_and_teck = clean_fuel_and_teck |> replace_inidcator_to_tooltip()
+tabacco_age_15 = tabacco_age_15  |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+nursing_services = nursing_services |> replace_inidcator_to_tooltip()
+sanitation_services = sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+
+```
+
+```{r}
 
 merged_data = full_join(merged_data, drinking_water_services, by=c("Location", "Period"))
 merged_data = full_join(merged_data, number_of_dentists, by=c("Location", "Period"))
@@ -263,360 +252,8 @@ merged_data = full_join(merged_data, maternal_mortality_ratio_data |> mutate(`Ma
 merged_data = full_join(merged_data, incidence_of_malaria_data |> mutate(`Malaria incidence (per 10 000 population at risk)`=`Malaria incidence (per 1 000 population at risk)`*10) |> select(-c(`Malaria incidence (per 1 000 population at risk)`)), by=c("Location", "Period"))
 merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`Incidence of tuberculosis (per 10 000 population per year)`=`Incidence of tuberculosis (per 100 000 population per year)`*10) |> select(-c(`Incidence of tuberculosis (per 100 000 population per year)`)), by=c("Location", "Period"))
 
-
 merged_data
 
-
-
-
-```
-
-
-```{r}
-
-infant_mortality_rate_data_mutated = infant_mortality_rate_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="mortality_rate") |> drop_na()
-
-# logged density of gender infant mortality rate
-infant_mortality_rate_data_mutated |> ggplot() + geom_density(aes(x=log(mortality_rate), fill=gender, alpha=0.75))
-
-infant_mortality_rate_data_mutated_male = infant_mortality_rate_data_mutated |> filter(gender=="Male")
-infant_mortality_rate_data_mutated_female = infant_mortality_rate_data_mutated |> filter(gender=="Female")
-
-mean_m = mean(infant_mortality_rate_data_mutated_male$mortality_rate)
-mean_f = mean(infant_mortality_rate_data_mutated_female$mortality_rate)
-
-std_m = sd(infant_mortality_rate_data_mutated_male$mortality_rate)
-std_f = sd(infant_mortality_rate_data_mutated_female$mortality_rate)
-
-generated_m = rnorm(1000, mean_m, std_m)
-generated_f = rnorm(1000, mean_f, std_f)
-
-ggplot() + geom_density(aes(x=infant_mortality_rate_data_mutated_male$mortality_rate, color="red")) + geom_density(aes(x=generated_m))
-
-ggplot() + geom_density(aes(x=infant_mortality_rate_data_mutated_female$mortality_rate, color="red")) + geom_density(aes(x=generated_f))
-
-# the distributions are not gaussian
-
-```
-
-```{r}
-
-
-life_expectency_at_birth_data_mutated = life_expectency_at_birth_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="life_expectency") |> drop_na()
-
-# logged density of gender infant mortality rate
-life_expectency_at_birth_data_mutated |> ggplot() + geom_density(aes(x=life_expectency, fill=gender, alpha=0.75))
-
-data_mutated_male = life_expectency_at_birth_data_mutated |> filter(gender=="Male")
-data_mutated_female = life_expectency_at_birth_data_mutated |> filter(gender=="Female")
-
-mean_m = mean(data_mutated_male$life_expectency)
-mean_f = mean(data_mutated_female$life_expectency)
-
-std_m = sd(data_mutated_male$life_expectency)
-std_f = sd(data_mutated_female$life_expectency)
-
-generated_m = rnorm(1000, mean_m, std_m)
-generated_f = rnorm(1000, mean_f, std_f)
-
-ggplot() + geom_density(aes(x=data_mutated_male$life_expectency, color="red")) + geom_density(aes(x=generated_m))
-
-ggplot() + geom_density(aes(x=data_mutated_female$life_expectency, color="red")) + geom_density(aes(x=generated_f))
-
-# the distributions are about gaussian
-
-```
-
-
-
-```{r}
-
-# Hypothesis: Female infant mortality is the same to male infant mortality (probability of dying between birth and age 1 per 1000 live births)
-
-# since we are using a bootstrap approach the data doesn't need to be normal
-
-infant_mortality_rate_data_mutated = infant_mortality_rate_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="mortality_rate") |> drop_na()
-
-infant_mortality_rate_data_mutated  = infant_mortality_rate_data_mutated |> mutate(mortality_rate=log(mortality_rate))
-
-infant_mortality_rate_data_mutated |> ggplot() + geom_boxplot(aes(x=gender, y=mortality_rate, fill=gender))
-
-bootstrap_diff_means = infant_mortality_rate_data_mutated |> specify(explanatory=gender, response=mortality_rate) |> hypothesize(null="independence") |> generate(1000, type="bootstrap") |> calculate(stat="diff in means", order=c("Female", "Male"))
-obs_mean = infant_mortality_rate_data_mutated |> specify(explanatory=gender, response=mortality_rate) |> calculate(stat="diff in means", order = c("Female", "Male"))
-CI = bootstrap_diff_means |> get_confidence_interval(point_estimate=obs_mean, level = 0.95)
-
-bootstrap_diff_means |> visualize() + shade_confidence_interval(CI) + geom_vline(xintercept=0) + labs(title="Bootstrap Distribution of Mean Difference (Female - Male)", x="Difference in Mean Infant Mortality Rate")
-
-```
-
-```{r}
-
-# Hypothesis: Female have the same life expectancy at birth to males
-
-life_expectency_at_birth_data_mutated = life_expectency_at_birth_data |> select(-c(`Both sexes`)) |> pivot_longer(c(Male, Female), names_to="gender", values_to="life_expectency") |> drop_na()
-
-life_expectency_at_birth_data_mutated |> ggplot() + geom_boxplot(aes(x=gender, y=life_expectency, fill=gender))
-
-bootstrap_diff_means = life_expectency_at_birth_data_mutated |> specify(explanatory=gender, response=life_expectency) |> hypothesize(null="independence") |> generate(1000, type="bootstrap") |> calculate(stat="diff in means", order=c("Female", "Male"))
-obs_mean = life_expectency_at_birth_data_mutated |> specify(explanatory=gender, response=life_expectency) |> calculate(stat="diff in means", order = c("Female", "Male"))
-CI = bootstrap_diff_means |> get_confidence_interval(point_estimate=obs_mean, level = 0.95)
-
-bootstrap_diff_means |> visualize() + shade_confidence_interval(CI) + geom_vline(xintercept=0) + labs(title="Bootstrap Distribution of Mean Difference (Female - Male)", x="Difference in Mean life expectancy at birth")
-
-
-
-```
-
-
-old merged data without the periods and less datasets
-```{r}
-
-# merging all the datasets into 1 taking the mean of all preiods
-# replaced with bigger merged_data 
-
-life_ex = life_expectency_at_birth_data |> group_by(Location) |> summarise(mean_life_expectancy_both_sexes=mean(`Both sexes`))
-doc_at_birth = birth_by_skilled_personel_data |> group_by(Location) |> summarise(mean_doct_at_birth_perc=mean(`Births attended by skilled health personnel (%)`))
-
-merged = full_join(life_ex, doc_at_birth, by="Location")
-
-n_doctors = medical_doctors_data |> group_by(Location) |> summarise(mean_n_doctors_per_10000=mean(`Medical doctors (per 10,000)`))
-
-merged = full_join(merged, n_doctors, by="Location")
-
-n_pharmacists = pharmacists_data |> group_by(Location) |> summarise(mean_n_pharmacists_per_10000=mean(`Pharmacists  (per 10,000)`))
-
-merged = full_join(merged, n_pharmacists, by="Location")
-
-infant_mortality_rate = infant_mortality_rate_data |> group_by(Location) |> summarise(mean_infant_mortality_rate=mean(`Both sexes`))
-
-merged = full_join(merged, infant_mortality_rate, by="Location")
-
-maternal_mortality_ratio = maternal_mortality_ratio_data |> group_by(Location) |> summarise(mean_maternal_mortality_ratio_per_10000=mean(`Maternal mortality ratio (per 100 000 live births)`) / 10)
-
-merged = full_join(merged, maternal_mortality_ratio, by="Location")
-
-incidence_of_malaria = incidence_of_malaria_data |> group_by(Location) |> summarise(mean_incidence_malaria_per_10000=mean(`Malaria incidence (per 1 000 population at risk)`) * 10)
-
-merged = full_join(merged, incidence_of_malaria, by="Location")
-
-incidence_of_tuberculosis = incidence_of_tuberculosis_data |> group_by(Location) |> summarise(mean_incidence_tuberculosis_per_10000=mean(`Incidence of tuberculosis (per 100 000 population per year)`) / 10)
-
-merged = full_join(merged, incidence_of_tuberculosis, by="Location")
-
-```
-
-```{r}
-
-continents <- c(
-  "Asia",                # Afghanistan
-  "Europe",              # Albania
-  "Africa",              # Algeria
-  "Africa",              # Angola
-  "North America",       # Antigua and Barbuda
-  "South America",       # Argentina
-  "Asia",                # Armenia
-  "Oceania",             # Australia
-  "Europe",              # Austria
-  "Asia",                # Azerbaijan
-  "North America",       # Bahamas
-  "Asia",                # Bahrain
-  "Asia",                # Bangladesh
-  "North America",       # Barbados
-  "Europe",              # Belarus
-  "Europe",              # Belgium
-  "North America",       # Belize
-  "Africa",              # Benin
-  "Asia",                # Bhutan
-  "South America",       # Bolivia (Plurinational State of)
-  "Europe",              # Bosnia and Herzegovina
-  "Africa",              # Botswana
-  "South America",       # Brazil
-  "Asia",                # Brunei Darussalam
-  "Europe",              # Bulgaria
-  "Africa",              # Burkina Faso
-  "Africa",              # Burundi
-  "Africa",              # Cabo Verde
-  "Asia",                # Cambodia
-  "Africa",              # Cameroon
-  "North America",       # Canada
-  "Africa",              # Central African Republic
-  "Africa",              # Chad
-  "South America",       # Chile
-  "Asia",                # China
-  "South America",       # Colombia
-  "Africa",              # Comoros
-  "Africa",              # Congo
-  "North America",       # Costa Rica
-  "Europe",              # Croatia
-  "North America",       # Cuba
-  "Asia",                # Cyprus
-  "Europe",              # Czechia
-  "Africa",              # Côte d’Ivoire
-  "Asia",                # Democratic People's Republic of Korea
-  "Africa",              # Democratic Republic of the Congo
-  "Europe",              # Denmark
-  "Africa",              # Djibouti
-  "North America",       # Dominican Republic
-  "South America",       # Ecuador
-  "Africa",              # Egypt
-  "North America",       # El Salvador
-  "Africa",              # Equatorial Guinea
-  "Africa",              # Eritrea
-  "Europe",              # Estonia
-  "Africa",              # Eswatini
-  "Africa",              # Ethiopia
-  "Oceania",             # Fiji
-  "Europe",              # Finland
-  "Europe",              # France
-  "Africa",              # Gabon
-  "Africa",              # Gambia
-  "Asia",                # Georgia
-  "Europe",              # Germany
-  "Africa",              # Ghana
-  "Europe",              # Greece
-  "North America",       # Grenada
-  "North America",       # Guatemala
-  "Africa",              # Guinea
-  "Africa",              # Guinea-Bissau
-  "South America",       # Guyana
-  "North America",       # Haiti
-  "North America",       # Honduras
-  "Europe",              # Hungary
-  "Europe",              # Iceland
-  "Asia",                # India
-  "Asia",                # Indonesia
-  "Asia",                # Iran (Islamic Republic of)
-  "Asia",                # Iraq
-  "Europe",              # Ireland
-  "Asia",                # Israel
-  "Europe",              # Italy
-  "North America",       # Jamaica
-  "Asia",                # Japan
-  "Asia",                # Jordan
-  "Asia",                # Kazakhstan
-  "Africa",              # Kenya
-  "Oceania",             # Kiribati
-  "Asia",                # Kuwait
-  "Asia",                # Kyrgyzstan
-  "Asia",                # Lao People's Democratic Republic
-  "Europe",              # Latvia
-  "Asia",                # Lebanon
-  "Africa",              # Lesotho
-  "Africa",              # Liberia
-  "Africa",              # Libya
-  "Europe",              # Lithuania
-  "Europe",              # Luxembourg
-  "Africa",              # Madagascar
-  "Africa",              # Malawi
-  "Asia",                # Malaysia
-  "Asia",                # Maldives
-  "Africa",              # Mali
-  "Europe",              # Malta
-  "Africa",              # Mauritania
-  "Africa",              # Mauritius
-  "North America",       # Mexico
-  "Oceania",             # Micronesia (Federated States of)
-  "Asia",                # Mongolia
-  "Europe",              # Montenegro
-  "Africa",              # Morocco
-  "Africa",              # Mozambique
-  "Asia",                # Myanmar
-  "Africa",              # Namibia
-  "Asia",                # Nepal
-  "Europe",              # Netherlands
-  "Oceania",             # New Zealand
-  "North America",       # Nicaragua
-  "Africa",              # Niger
-  "Africa",              # Nigeria
-  "Europe",              # Norway
-  "Asia",                # Oman
-  "Asia",                # Pakistan
-  "North America",       # Panama
-  "Oceania",             # Papua New Guinea
-  "South America",       # Paraguay
-  "South America",       # Peru
-  "Asia",                # Philippines
-  "Europe",              # Poland
-  "Europe",              # Portugal
-  "Asia",                # Qatar
-  "Asia",                # Republic of Korea
-  "Europe",              # Republic of Moldova
-  "Europe",              # Romania
-  "Europe",              # Russian Federation (primary)
-  "Africa",              # Rwanda
-  "North America",       # Saint Lucia
-  "North America",       # Saint Vincent and the Grenadines
-  "Oceania",             # Samoa
-  "Africa",              # Sao Tome and Principe
-  "Asia",                # Saudi Arabia
-  "Africa",              # Senegal
-  "Europe",              # Serbia
-  "Africa",              # Seychelles
-  "Africa",              # Sierra Leone
-  "Asia",                # Singapore
-  "Europe",              # Slovakia
-  "Europe",              # Slovenia
-  "Oceania",             # Solomon Islands
-  "Africa",              # Somalia
-  "Africa",              # South Africa
-  "Africa",              # South Sudan
-  "Europe",              # Spain
-  "Asia",                # Sri Lanka
-  "Africa",              # Sudan
-  "Africa",              # Sudan (until 2011)
-  "South America",       # Suriname
-  "Europe",              # Sweden
-  "Europe",              # Switzerland
-  "Asia",                # Syrian Arab Republic
-  "Asia",                # Tajikistan
-  "Asia",                # Thailand
-  "Europe",              # The former Yugoslav Republic of Macedonia
-  "Asia",                # Timor-Leste
-  "Africa",              # Togo
-  "Oceania",             # Tonga
-  "North America",       # Trinidad and Tobago
-  "Africa",              # Tunisia
-  "Asia",                # Turkey (primary)
-  "Asia",                # Turkmenistan
-  "Africa",              # Uganda
-  "Europe",              # Ukraine
-  "Asia",                # United Arab Emirates
-  "Europe",              # United Kingdom of Great Britain and Northern Ireland
-  "Africa",              # United Republic of Tanzania
-  "North America",       # United States of America
-  "South America",       # Uruguay
-  "Asia",                # Uzbekistan
-  "Oceania",             # Vanuatu
-  "South America",       # Venezuela (Bolivarian Republic of)
-  "Asia",                # Viet Nam
-  "Asia",                # Yemen
-  "Africa",              # Zambia
-  "Africa",              # Zimbabwe
-  "Europe",              # Andorra
-  "Oceania",             # Cook Islands
-  "North America",       # Dominica
-  "Oceania",             # Marshall Islands
-  "Oceania",             # Nauru
-  "Oceania",             # Niue
-  "Oceania",             # Palau
-  "North America",       # Saint Kitts and Nevis
-  "Asia",                # State of Palestine
-  "Oceania",             # Tuvalu
-  "Europe",              # Monaco
-  "Europe",              # San Marino
-  "Europe",              # Germany, Federal Republic (former)
-  "Asia",                # India (until 1975)
-  "Oceania",             # Kiribati (until 1984)
-  "Asia"                 # South Viet Nam (former)
-)
-
-locations = merged$Location
-
-continents_dict = setNames(continents, locations)
-
-continent_list_for_merged_data = continents_dict[merged_data$Location]
-
-merged_data = merged_data |> mutate(continent=continent_list_for_merged_data)
 ```
 
 
@@ -628,40 +265,230 @@ outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria i
 explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
 explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
 
-merged_data_outcome_feat = merged_data |> select(c(Location, Period)) |> bind_cols(merged_data[outcome_feat])
-merged_data_explanatory_feat = merged_data |> select(c(Location, Period)) |> bind_cols(merged_data[explanatory_feat])
-
-```
-
-```{r}
-
-# ggpairs(merged_data_explanatory_feat |> select(-c(Location, Period)), progress=FALSE)
-
 ```
 
 
 ```{r}
 
-merged_train_test_split = merged_data |> initial_split(prop=0.8)
+non_na_per_period <- merged_data %>% select(-c(Location)) %>%
+  rowwise() %>%
+  mutate(non_na_count = sum(!is.na(c_across(where(~ !is.list(.x)))))) %>%
+  ungroup() %>%
+  group_by(Period) %>%
+  summarise(total_non_na = sum(non_na_count))
+
+ggplot(non_na_per_period, aes(x = Period, y = total_non_na)) +
+  geom_col(fill = "seagreen") +
+  labs(title = "Total Non-NA Values per Period",
+       x = "Year",
+       y = "Non-NA Value Count") +
+  theme_minimal()
+
+# lets keep the data only from 2000 on wards
+
+merged_data = merged_data |> filter(Period >= 2000)
+
+na_counts <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count")
+
+ggplot(na_counts, aes(x = reorder(feature, na_count), y = na_count)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(title = "NA Values per Feature",
+       x = "Feature",
+       y = "NA Count") +
+  theme_minimal()
+
+valid_features <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count") %>%
+  filter(na_count < 3000) %>%
+  pull(feature)
+
+cleaned_merged_data <- merged_data %>%
+  select(all_of(valid_features))
+
+```
+```{r}
+
+explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
+
+```
+
+
+```{r}
+
+numeric_data <- cleaned_merged_data %>% 
+  select(c(explanatory_feat)) %>%
+  select(where(is.numeric))
+
+cor_matrix <- cor(numeric_data, use = "pairwise.complete.obs")
+
+cor_long <- cor_matrix %>%
+  as_tibble(rownames = "feature1") %>%
+  pivot_longer(-feature1, names_to = "feature2", values_to = "correlation") %>%
+  filter(feature1 != feature2) %>%
+  mutate(pair = map2_chr(feature1, feature2, ~ paste(sort(c(.x, .y)), collapse = "___"))) %>%
+  distinct(pair, .keep_all = TRUE) %>%
+  select(-pair)
+
+top_5_corr <- cor_long %>%
+  arrange(desc(abs(correlation))) %>%
+  slice_head(n = 10)
+
+```
+
+```{r}
+top_5_corr
+
+cleaned_merged_data = cleaned_merged_data |> select(-c(under_5_mortality_rate, `Neonatal mortality rate (per 10 000 live births)`, `Neonatal mortality rate (per 10 000 live births)`))
+```
+
+
+```{r, fig.width=10, fig.height=6}
+
+# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> drop_na(), progress = F)
+
+```
+
+
+```{r}
+
+explanatory_feat_infant_mortality = c(explanatory_feat, "infant_mortality_rate")
+
+merged_train_test_split = cleaned_merged_data |> select(explanatory_feat_infant_mortality) |> filter(!is.na(infant_mortality_rate)) |> initial_split(prop=0.8)
 
 merged_data_train = training(merged_train_test_split)
 merged_data_test = testing(merged_train_test_split)
 
+# merged_data_train_wo_cont = merged_data_train |> select(-c(continent))
+# merged_data_test_wo_cont = merged_data_test |> select(-c(continent))
+
+
 ```
 
 ```{r}
+
+# recipes
 
 base_recipe = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_normalize(all_numeric_predictors())
 
-base_recipe_imputed = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_impute_mean(all_numeric_predictors()) |> step_normalize(all_numeric_predictors())
+recipe_imputed = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_impute_mean(all_numeric_predictors()) |> step_normalize(all_numeric_predictors())
 
 ```
 
 ```{r}
 
+# models
+
+lin_reg <- linear_reg() |> set_engine("lm")
+rf_model  <- rand_forest() |> set_engine("ranger") |> set_mode("regression")
+xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("regression")
+knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("regression")
+
+```
+
+```{r}
+
+# workflows
+
+lr_workflow = workflow() |> add_model(lin_reg) |> add_recipe(recipe_imputed)
+rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(recipe_imputed)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(recipe_imputed)
+knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(recipe_imputed)
+
+```
+
+```{r}
+# cross validation for k
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+knn_grid <- tibble(neighbors = seq(1, 20, by = 1))
+
+knn_tune_results <- tune_grid(
+  knn_workflow,
+  resamples = cv_folds,
+  grid = knn_grid,
+  metrics = metric_set(rmse, rsq, mae)
+)
+
+best_k <- select_best(knn_tune_results, metric = "rmse")
+
+final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
+
+```
+
+
+```{r}
+
+lr_fit  <- fit(lr_workflow, data = merged_data_train)
+rf_fit  <- fit(rf_workflow, data = merged_data_train)
+xgb_fit <- fit(xgb_workflow, data = merged_data_train)
+knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+
+
+lr_preds <- predict(lr_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Linear")
+
+rf_preds <- predict(rf_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Random Forest")
+
+xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "XGBoost")
+
+knn_preds <- predict(knn_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Knn")
+
+all_preds <- bind_rows(lr_preds, rf_preds, xgb_preds, knn_preds)
+
+pred_tibble = all_preds %>%
+  group_by(model) %>%
+  metrics(truth = infant_mortality_rate, estimate = .pred)
+
+# rmse: root mean square error
+# rsq: R^2
+# mae: mean absolute error
+```
+
+```{r}
+
+pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
+
+```
+
+```{r}
+
+lr_fitted <- extract_fit_parsnip(lr_fit)
+tidy(lr_fitted)
+
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
