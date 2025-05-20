@@ -30,7 +30,7 @@ For the duration of this report, we will be using a select amount of data to dra
 
 We are looking at this data project as aliens who are very logical but not very informed, and have a slice of data with which to assess the world. We know there are many different countries, that are separated by borders and each decide how to rule their own territories. We want to determine the best countries, using information inherent to the medical scope, and their primary features of influence. This will help us find ways to improve and suggest improvements to countries doing less well.
 
-Our research questions, from more generic to more specific are:
+We would like to find out:
 
 -   What are the best outcomes for a country, and what are the primary influencing features for these outcomes;
 -   Using the most influential features found above, can we determine a given country's continent of origin
@@ -52,11 +52,11 @@ Our first step is to separate the features into variables we can use to evaluate
 infant_mortality_rate_data = read_csv("data/infantMortalityRate.csv")
 maternal_mortality_ratio_data = read_csv("data/maternalMortalityRatio.csv")
 life_expectency_at_birth_data = read_csv("data/lifeExpectancyAtBirth.csv")
+under_5_mortality_rate = read_csv("data/under5MortalityRate.csv")
 incidence_of_malaria_data = read_csv("data/incedenceOfMalaria.csv")
 incidence_of_tuberculosis_data = read_csv("data/incedenceOfTuberculosis.csv")
-neo_natal_mortality_rate = read_csv("data/neonatalMortalityRate.csv")
 new_hiv_infections = read_csv("data/newHivInfections.csv")
-under_5_mortality_rate = read_csv("data/under5MortalityRate.csv")
+neo_natal_mortality_rate = read_csv("data/neonatalMortalityRate.csv")
 crude_sucide_rates = read_csv("data/crudeSuicideRates.csv") # has to do with well-being as it reflects happiness
 poison_mortality_rate = read_csv("data/mortalityRatePoisoning.csv") # consider removing, not altogether medical related
 road_traffic_deaths = read_csv("data/roadTrafficDeaths.csv") # consider removing, not medical related
@@ -75,13 +75,202 @@ sanitation_services = read_csv("data/safelySanitization.csv")
 clean_fuel_and_teck = read_csv("data/cleanFuelAndTech.csv") # consider removing, not medical related
 tabacco_age_15 = read_csv("data/tobaccoAge15.csv") # consider removing, not medical related
 
+
+# Note: many features correlate on a given model or prediction, so in many cases 
+# we will not use the totality of the data as the information in a given features 
+# may not be unique, and is found in other features for a specific use case.
+
 # Test one data set
 head(medical_doctors_data, 5)
 ```
 
+<<<<<<< HEAD
 Note: many features correlate on a given model or prediction, so in many cases we will not use the totality of the data as the information in a given features may not be unique, and is found in other features for a specific use case.
+=======
+To make every research question meaningful, all data sets used to find experiments and answers belong to the same time periods. We will select relevant features and time periods appropriately.
+>>>>>>> 4e71988c7b749f93abfd11d10bdfd27d608f1808
 
 ## 4. Experiments and findings
+
+### 4.1 Question 1
+
+Our first research question surrounds the general state of the countries in our data set. Can we determine what the best outcome for a country is and how it is affected by the available decision variables.
+
+First of all we need to decide what is "the best" country. This could mean the least mortality, the highest life expectancy at birth, the least amount of suicides or many other things. To find an overall score for what could be the best, we selected the a recent year in the dataframe for which we have a good amount of data, and looked for that year's happiness index.
+
+Below is the list form of the happiness scores of the countries for which data was available in 2017, found at [vividmaps.com](https://vividmaps.com/happiness-index/).
+
+```{r}
+happiness_map <- c(
+  "Norway" =  7.537,
+  "Denmark" = 7.522,
+  "Iceland" = 7.504,
+  "Switzerland" = 7.494,
+  "Finland" = 7.469,
+  "Netherlands"= 7.377,
+  "Canada" = 7.316,
+  "New Zealand" = 7.314,
+  "Australia" = 7.284,
+  "Sweden" = 7.284,
+  "Israel" = 7.213,
+  "Costa Rica" = 7.079,
+  "Austria" = 7.006,
+  "United States" = 6.993,
+  "Ireland" = 6.977,
+  "Germany" = 6.951,
+  "Belgium" = 6.891,
+  "Luxembourg" = 6.863,
+  "United Kingdom" = 6.714,
+  "Chile" = 6.652,
+  "United Arab Emirates" = 6.648,
+  "Brazil" = 6.635,
+  "Czech Republic" = 6.609,
+  "Argentina" = 6.599,
+  "Mexico" = 6.578,
+  "Singapore" = 6.572,
+  "Malta" = 6.527,
+  "Uruguay" = 6.454,
+  "Guatemala" = 6.454,
+  "Panama" = 6.452,
+  "France" = 6.442,
+  "Thailand" = 6.424,
+  "Taiwan" = 6.422,
+  "Spain" = 6.403,
+  "Qatar" = 6.375,
+  "Colombia" = 6.357,
+  "Saudi Arabia" = 6.344,
+  "Trinidad and Tobago" = 6.168,
+  "Kuwait" = 6.105,
+  "Slovakia" = 6.098,
+  "Bahrain" = 6.087,
+  "Malaysia" = 6.084,
+  "Nicaragua" = 6.071,
+  "Ecuador" = 6.008,
+  "El Salvador" = 6.003,
+  "Poland" = 5.973,
+  "Uzbekistan" = 5.971,
+  "Italy" = 5.964,
+  "Russia" = 5.963,
+  "Belize" = 5.956,
+  "Japan" = 5.920,
+  "Lithuania" = 5.902,
+  "Algeria" = 5.872,
+  "Latvia" = 5.850,
+  "Moldova" = 5.838,
+  "South Korea" = 5.838,
+  "Romania" = 5.825,
+  "Bolivia" = 5.823,
+  "Turkmenistan" = 5.822,
+  "Kazakhstan" = 5.819,
+  "North Cyprus" = 5.810,
+  "Slovenia" = 5.758,
+  "Peru" = 5.715,
+  "Mauritius" = 5.629,
+  "Cyprus" = 5.621,
+  "Estonia" = 5.611,
+  "Belarus" = 5.569,
+  "Libya" = 5.525,
+  "Turkey" = 5.500,
+  "Paraguay" = 5.493,
+  "Hong Kong" = 5.472,
+  "Philippines" = 5.430,
+  "Serbia" = 5.395,
+  "Jordan" = 5.336,
+  "Hungary" = 5.324,
+  "Jamaica" = 5.311,
+  "Croatia" = 5.293,
+  "Kosovo" = 5.279,
+  "China" = 5.273,
+  "Pakistan" = 5.269,
+  "Indonesia" = 5.262,
+  "Venezuela" = 5.250,
+  "Montenegro" = 5.237,
+  "Morocco" = 5.235,
+  "Azerbaijan" = 5.234,
+  "Dominican Republic" = 5.230,
+  "Greece" = 5.227,
+  "Lebanon" = 5.225,
+  "Portugal" = 5.195,
+  "Bosnia and Herzegovina" = 5.182,
+  "Honduras" = 5.181,
+  "Macedonia" = 5.175,
+  "Somalia" = 5.151,
+  "Vietnam" = 5.074,
+  "Nigeria" = 5.074,
+  "Tajikistan" = 5.041,
+  "Bhutan" = 5.011,
+  "Kyrgyzstan" = 5.004,
+  "Nepal" = 4.962,
+  "Mongolia" = 4.955,
+  "South Africa" = 4.829,
+  "Tunisia" = 4.805,
+  "Palestinian Territories" = 4.775,
+  "Egypt" = 4.735,
+  "Bulgaria" = 4.714,
+  "Sierra Leone" = 4.709,
+  "Cameroon" = 4.695,
+  "Iran" = 4.692,
+  "Albania" = 4.644,
+  "Bangladesh" = 4.608,
+  "Namibia" = 4.574,
+  "Kenya" = 4.553,
+  "Mozambique" = 4.550,
+  "Myanmar" = 4.545,
+  "Senegal" = 4.535,
+  "Zambia" = 4.514,
+  "Iraq" = 4.497,
+  "Gabon" = 4.465,
+  "Ethiopia" = 4.460,
+  "Sri Lanka" = 4.440,
+  "Armenia" = 4.376,
+  "India" = 4.315,
+  "Mauritania" = 4.292,
+  "Congo (Brazzaville)" = 4.291,
+  "Georgia" = 4.286,
+  "Congo (Kinshasa)" = 4.280,
+  "Mali" = 4.190,
+  "Ivory Coast" = 4.180,
+  "Cambodia" = 4.168,
+  "Sudan" = 4.139,
+  "Ghana" = 4.120,
+  "Ukraine" = 4.096,
+  "Uganda" = 4.081,
+  "Burkina Faso" = 4.032,
+  "Niger" = 4.028,
+  "Malawi" = 3.970,
+  "Chad" = 3.936,
+  "Zimbabwe" = 3.875,
+  "Lesotho" = 3.808,
+  "Angola" = 3.795,
+  "Afghanistan" = 3.794,
+  "Botswana" = 3.766,
+  "Benin" = 3.657,
+  "Madagascar" = 3.644,
+  "Haiti" = 3.603,
+  "Yemen" = 3.593,
+  "South Sudan" = 3.591,
+  "Liberia" = 3.533,
+  "Guinea" = 3.507,
+  "Togo" = 3.495,
+  "Rwanda" = 3.471,
+  "Syria" = 3.462,
+  "Tanzania" = 3.349,
+  "Burundi" = 2.905,
+  "Central African Republic" = 2.693)
+
+```
+
+Let's compare the features for 2017 of the top 10 countries by happiness in 2017, so as to get a good idea of what the "best" country is determined by. More specifically, let's have a look at those we have designated as outcome variables.
+
+```{r}
+
+best_countries <- names(happiness_map)[1:10]
+
+
+
+```
+
+
 
 ## 5. Conclusion
 
