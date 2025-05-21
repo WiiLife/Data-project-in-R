@@ -19,6 +19,9 @@ library(ranger)
 options(ranger.num.threads = 16)
 library(xgboost)
 library(kknn)
+library(performance)
+library(discrim)
+library(vip)
 ```
 
 PROJECT
@@ -30,61 +33,45 @@ data and the methods’ advantages and limitations; – present the results
 in a concise way through a presentation; – present the work in a more
 extensive way with a report.
 
-Question setup:
-We are aliens who are looking at Earth. We have a vague understanding that the territory is separated by geographical regions, countries and continents, and each has a choice on how to run its own territory. We land in a determined region and want to see how to improve it.
+Question setup: We are aliens who are looking at Earth. We have a vague
+understanding that the territory is separated by geographical regions,
+countries and continents, and each has a choice on how to run its own
+territory. We land in a determined region and want to see how to improve
+it.
 
-First of all: 
-determine how to evaluate a country: (outcome variables)
-- infant mortality rate
-- maternal mortality rate
-- life expectancy at birth
-- air pollution death rate
-- crude suicide rates (??)
-- incidents of malaria
-- incidents of tuberculosis
-- poisoning mortality rate (??)
-- neonatal mortality rate
-- new HIV infections (??)
-- road traffic deaths
-- under 5 mortality rate
+First of all: determine how to evaluate a country: (outcome variables) -
+infant mortality rate - maternal mortality rate - life expectancy at
+birth - air pollution death rate - crude suicide rates (??) - incidents
+of malaria - incidents of tuberculosis - poisoning mortality rate (??) -
+neonatal mortality rate - new HIV infections (??) - road traffic
+deaths - under 5 mortality rate
 
-determine what a country can change to influence the above outcomes: (decision variables)
-- number of doctors
-- number of dentists
-- number of pharmacists
-- basic drinking water services
-- least basic sanitation services
-- births attended by skilled personnel
-- basic hand washing
-- clean fuel and tech
-- tobacco at age 15 (advertisement) (maybe not this)
-- nursing and midwife numbers
-- usage of sanitation services
-
+determine what a country can change to influence the above outcomes:
+(decision variables) - number of doctors - number of dentists - number
+of pharmacists - basic drinking water services - least basic sanitation
+services - births attended by skilled personnel - basic hand washing -
+clean fuel and tech - tobacco at age 15 (advertisement) (maybe not
+this) - nursing and midwife numbers - usage of sanitation services
 
 POTENTAIL QUESTIONS TO BE ANSWERED
 
-Q1. Which are the most impactful features (decision variables) when predicting outcome variables (lin reg)
-Q2. predict classification outcome variables based in decision variables 
-Q3. do this for a specific country/continent (looking at the historic data and all different features)
-Q4. (maybe) clustering by Continent based on important outcome features
+Q1. Which are the most impactful features (decision variables) when
+predicting outcome variables (lin reg) Q2. predict classification
+outcome variables based in decision variables Q3. do this for a specific
+country/continent (looking at the historic data and all different
+features) Q4. (maybe) clustering by Continent based on important outcome
+features
 
 Hypothesis: Higher literacy/education levels are associated with better
-            health outcomes (e.g., lower infant mortality). 
-Hypothesis: Female have
-            the same life expectancy at birth to males 
-Hypothesis: Female infant
-            mortality is the same to male infant mortality. 
+health outcomes (e.g., lower infant mortality). Hypothesis: Female have
+the same life expectancy at birth to males Hypothesis: Female infant
+mortality is the same to male infant mortality.
 
+correlations Hypothesis: incidence of diseases (Tuberculosis, Malaria)
+correlate with infant mortality rate Hypothesis: medical doctors
+correlate with life expectancy at birth ...
 
-correlations 
-Hypothesis: incidence of diseases (Tuberculosis, Malaria)
-            correlate with infant mortality rate 
-Hypothesis: medical doctors
-            correlate with life expectancy at birth ...
-            
-classification
-classify continent based on features (?specific year)
+classification classify continent based on features (?specific year)
 
 Loading data which might seem useful to answer statistical questions
 
@@ -111,7 +98,7 @@ pharmacists_data = read_csv("data/pharmacists.csv")
 birth_by_skilled_personel_data = read_csv("data/birthAttendedBySkilledPersonal.csv")
 number_of_dentists = read_csv("data/dentists.csv")
 drinking_water_services = read_csv("data/basicDrinkingWaterServices.csv")
-least_basic_sanitation_services = read_csv("data/atLeastBasicSanitizationServices.csv")
+# least_basic_sanitation_services = read_csv("data/atLeastBasicSanitizationServices.csv")
 basic_hand_washing = read_csv("data/basicHandWashing.csv")
 clean_fuel_and_teck = read_csv("data/cleanFuelAndTech.csv")
 tabacco_age_15 = read_csv("data/tobaccoAge15.csv")
@@ -135,8 +122,6 @@ replace_inidcator_to_tooltip = function(tibble) {
 }
 
 ```
-
-
 
 ```{r}
 
@@ -219,7 +204,7 @@ road_traffic_deaths = road_traffic_deaths |> replace_inidcator_to_tooltip()
 under_5_mortality_rate = under_5_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
 number_of_dentists = number_of_dentists |> replace_inidcator_to_tooltip()
 drinking_water_services = drinking_water_services |> replace_inidcator_to_tooltip()
-least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+# least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
 basic_hand_washing = basic_hand_washing |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
 clean_fuel_and_teck = clean_fuel_and_teck |> replace_inidcator_to_tooltip()
 tabacco_age_15 = tabacco_age_15  |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
@@ -232,7 +217,7 @@ sanitation_services = sanitation_services |> pivot_wider(names_from=Dim1, values
 
 merged_data = full_join(merged_data, drinking_water_services, by=c("Location", "Period"))
 merged_data = full_join(merged_data, number_of_dentists, by=c("Location", "Period"))
-merged_data = full_join(merged_data, least_basic_sanitation_services |> rename(sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+# merged_data = full_join(merged_data, least_basic_sanitation_services |> rename(sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
 merged_data = full_join(merged_data, basic_hand_washing |> rename(basic_hand_washing_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
 merged_data = full_join(merged_data, tabacco_age_15 |> rename(tabacco_age_15=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
 merged_data = full_join(merged_data, nursing_services, by=c("Location", "Period"))
@@ -256,8 +241,6 @@ merged_data
 
 ```
 
-
-
 ```{r}
 
 outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria incidence (per 10 000 population at risk)", "Incidence of tuberculosis (per 10 000 population per year)", "under_5_mortality_rate", "Estimated road traffic death rate (per 10 000 population)", "hiv_infections", "Neonatal mortality rate (per 10 000 live births)", "poison_mortality_rate", "sucide_rate", "life_expectency_at_birth", "infant_mortality_rate")
@@ -266,7 +249,6 @@ explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
 explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
 
 ```
-
 
 ```{r}
 
@@ -310,14 +292,16 @@ cleaned_merged_data <- merged_data %>%
   select(all_of(valid_features))
 
 ```
+
 ```{r}
 
 explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
 
 ```
 
-
 ```{r}
+
+# get correlation between each pair of features and get the top 5 pairs
 
 numeric_data <- cleaned_merged_data %>% 
   select(c(explanatory_feat)) %>%
@@ -340,18 +324,17 @@ top_5_corr <- cor_long %>%
 ```
 
 ```{r}
-top_5_corr
+
+# remove most correlated outcome features
 
 cleaned_merged_data = cleaned_merged_data |> select(-c(under_5_mortality_rate, `Neonatal mortality rate (per 10 000 live births)`, `Neonatal mortality rate (per 10 000 live births)`))
 ```
-
 
 ```{r, fig.width=10, fig.height=6}
 
 # ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> drop_na(), progress = F)
 
 ```
-
 
 ```{r}
 
@@ -361,9 +344,6 @@ merged_train_test_split = cleaned_merged_data |> select(explanatory_feat_infant_
 
 merged_data_train = training(merged_train_test_split)
 merged_data_test = testing(merged_train_test_split)
-
-# merged_data_train_wo_cont = merged_data_train |> select(-c(continent))
-# merged_data_test_wo_cont = merged_data_test |> select(-c(continent))
 
 
 ```
@@ -383,8 +363,9 @@ recipe_imputed = recipe(merged_data_train) |> update_role(infant_mortality_rate,
 # models
 
 lin_reg <- linear_reg() |> set_engine("lm")
-rf_model  <- rand_forest() |> set_engine("ranger") |> set_mode("regression")
+rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("regression")
 xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("regression")
+lasso_model <- linear_reg(penalty = tune(), mixture = 1) |> set_engine("glmnet") |> set_mode("regression")
 knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("regression")
 
 ```
@@ -395,9 +376,14 @@ knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |
 
 lr_workflow = workflow() |> add_model(lin_reg) |> add_recipe(recipe_imputed)
 rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(recipe_imputed)
-xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(recipe_imputed)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(base_recipe)
 knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(recipe_imputed)
+lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(recipe_imputed)
 
+```
+
+```{r}
+metrics <- metric_set(yardstick::rmse, yardstick::mae, yardstick::rsq)
 ```
 
 ```{r}
@@ -405,14 +391,16 @@ knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(recipe_imputed)
 
 cv_folds <- vfold_cv(merged_data_train, v = 5)
 
-knn_grid <- tibble(neighbors = seq(1, 20, by = 1))
+knn_grid <- tibble(neighbors = seq(1, 10, by = 1))
 
 knn_tune_results <- tune_grid(
   knn_workflow,
   resamples = cv_folds,
   grid = knn_grid,
-  metrics = metric_set(rmse, rsq, mae)
+  metrics = metrics
 )
+
+autoplot(knn_tune_results)
 
 best_k <- select_best(knn_tune_results, metric = "rmse")
 
@@ -420,6 +408,26 @@ final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
 
 ```
 
+```{r}
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+lasso_grid <- tibble(penalty = seq(0.01, 1, by=0.01))
+
+lasso_tune_results <- tune_grid(
+  lasso_workflow,
+  resamples = cv_folds,
+  grid = lasso_grid,
+  metrics = metrics
+)
+
+autoplot(lasso_tune_results)
+
+best_reg <- select_best(lasso_tune_results, metric = "rmse")
+
+final_lasso_workflow <- finalize_workflow(lasso_workflow, best_reg)
+
+```
 
 ```{r}
 
@@ -427,6 +435,7 @@ lr_fit  <- fit(lr_workflow, data = merged_data_train)
 rf_fit  <- fit(rf_workflow, data = merged_data_train)
 xgb_fit <- fit(xgb_workflow, data = merged_data_train)
 knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
 
 
 lr_preds <- predict(lr_fit, merged_data_test) %>%
@@ -445,7 +454,11 @@ knn_preds <- predict(knn_fit, merged_data_test) %>%
   bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
   mutate(model = "Knn")
 
-all_preds <- bind_rows(lr_preds, rf_preds, xgb_preds, knn_preds)
+lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Lasso")
+
+all_preds <- bind_rows(lr_preds, rf_preds, xgb_preds, knn_preds, lasso_preds)
 
 pred_tibble = all_preds %>%
   group_by(model) %>%
@@ -461,33 +474,237 @@ pred_tibble = all_preds %>%
 pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
 
 ```
+```{r, fig.width=10, fig.height=6}
 
-```{r}
-
-lr_fitted <- extract_fit_parsnip(lr_fit)
-tidy(lr_fitted)
-
-
+lr_fit |> extract_fit_engine() |> check_model()
 
 ```
 
 
+```{r}
+
+# got explanation for linear regression 
+
+lr_fit |> extract_fit_engine() |> vip()
+
+```
+
+```{r}
+
+rf_fit |> extract_fit_engine() |> vip()
+
+```
 
 
+```{r}
 
+mean_tub <- mean(cleaned_merged_data$`Incidence of tuberculosis (per 10 000 population per year)`, na.rm = TRUE)
 
+# get binned tuberculosis based on mean
+cleaned_merged_data <- cleaned_merged_data |> mutate(binned_tuberculosis = if_else(`Incidence of tuberculosis (per 10 000 population per year)` > mean_tub, 1, 0)) |> filter(!is.na(binned_tuberculosis)) |> mutate(binned_tuberculosis = as.factor(binned_tuberculosis))
 
+data_for_model = cleaned_merged_data |> select(all_of(explanatory_feat), binned_tuberculosis)
 
+data_split <- initial_split(data_for_model, prop = 0.8, strata = binned_tuberculosis) # strata maintains proportion of binned tuberculosis in training and testing
+merged_data_train <- training(data_split)
+merged_data_test <- testing(data_split)
 
+```
 
+```{r}
 
+# recipe for classification
 
+imputed_rec <- recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_impute_mean(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_normalize(all_numeric_predictors())
 
+basic_rec <-recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_normalize(all_numeric_predictors())
 
+```
 
+```{r}
 
+# models
 
+# nb_model <- naive_Bayes(smoothness = tune()) |> set_engine("KlaR") |> set_mode("classification")
+knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("classification")
+rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("classification")
+xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("classification")
+lasso_model <- logistic_reg(penalty = tune(), mixture = 1) |> set_engine("glmnet") |> set_mode("classification")
 
+```
+
+```{r}
+
+# workflows
+
+# nb_workflow = workflow() |> add_model(nb_model) |> add_recipe(imputed_rec)
+rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(imputed_rec)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(basic_rec) # no need to impute
+knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(imputed_rec)
+lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(imputed_rec)
+
+```
+
+```{r}
+metrics <- metric_set(yardstick::accuracy, yardstick::precision, yardstick::recall, yardstick::f_meas) 
+```
+
+```{r}
+# cross validation for smoothness
+
+# cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+# smooth_grid <- tibble(smoothness = seq(1, 10, by = 1))
+
+# smooth_tune_results <- tune_grid(nb_workflow, resamples = cv_folds, grid = smooth_grid, metrics = metrics)
+
+# autoplot(smooth_tune_results)
+
+# best_smooth <- select_best(smooth_tune_results, metric = "accuracy")
+
+# final_knn_workflow <- finalize_workflow(nb_workflow, best_smooth)
+
+```
+
+```{r}
+# cross validation for k
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+knn_grid <- tibble(neighbors = seq(1, 30, by = 1))
+
+knn_tune_results <- tune_grid(
+  knn_workflow,
+  resamples = cv_folds,
+  grid = knn_grid,
+  metrics = metrics
+)
+
+autoplot(knn_tune_results)
+
+best_k <- select_best(knn_tune_results, metric = "accuracy")
+
+final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
+
+```
+```{r}
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+lasso_grid <- tibble(penalty = seq(0.0001, 1, by=0.01))
+
+lasso_grid <- grid_regular(penalty(), levels = 10)
+
+lasso_tune_results <- tune_grid(
+  lasso_workflow,
+  resamples = cv_folds,
+  grid = lasso_grid,
+  metrics = metrics
+)
+
+autoplot(lasso_tune_results)
+
+best_reg <- select_best(lasso_tune_results, metric = "accuracy")
+
+final_lasso_workflow <- finalize_workflow(lasso_workflow, best_reg)
+
+show_notes(lasso_tune_results)
+
+```
+
+```{r}
+
+# nb_fit  <- fit(nb_workflow, data = merged_data_train)
+rf_fit  <- fit(rf_workflow, data = merged_data_train)
+xgb_fit <- fit(xgb_workflow, data = merged_data_train)
+knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
+
+# nb_preds <- predict(nb_fit, merged_data_test) %>%
+  # bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  # mutate(model = "Linear")
+
+rf_preds <- predict(rf_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
+rf_preds_prob <- predict(rf_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
+
+xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+xgb_preds_prob <- predict(xgb_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+
+knn_preds <- predict(knn_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
+knn_preds_prob <- predict(knn_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
+
+lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+lasso_preds_prob <- predict(lasso_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+
+all_preds <- bind_rows(rf_preds, xgb_preds, knn_preds, lasso_preds) # nb_preds
+
+all_preds_prob = bind_rows(rf_preds_prob, xgb_preds_prob, knn_preds_prob, lasso_preds_prob)
+
+pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosis, estimate = .pred_class)
+
+# rmse: root mean square error
+# rsq: R^2
+# mae: mean absolute error
+
+```
+```{r}
+
+pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
+
+```
+```{r}
+
+for (m in unique(all_preds$model)) {
+  cm = all_preds |> filter(model == m) |> conf_mat(truth = binned_tuberculosis, .pred_class) |> autoplot(type = "heatmap")
+  print(cm)
+}
+
+```
+
+```{r}
+
+for (m in unique(all_preds$model)) {
+  
+  roc_curve = all_preds_prob |> filter(model == m) |> roc_curve(truth = binned_tuberculosis, .pred_0) |> autoplot() + ggtitle(paste("ROC Curve -", m))
+  print(roc_curve)
+}
+
+```
+
+```{r}
+
+# xgb model
+
+xgb_fit |> extract_fit_engine() |> vip()
+
+```
+```{r}
+
+# random forest 
+
+rf_fit |> extract_fit_engine() |> vip()
+
+```
 
 
 
