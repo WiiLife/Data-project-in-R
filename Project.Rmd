@@ -20,6 +20,8 @@ options(ranger.num.threads = 16)
 library(xgboost)
 library(kknn)
 library(performance)
+library(discrim)
+library(vip)
 ```
 
 PROJECT
@@ -374,7 +376,7 @@ knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |
 
 lr_workflow = workflow() |> add_model(lin_reg) |> add_recipe(recipe_imputed)
 rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(recipe_imputed)
-xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(recipe_imputed)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(base_recipe)
 knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(recipe_imputed)
 lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(recipe_imputed)
 
@@ -483,17 +485,195 @@ lr_fit |> extract_fit_engine() |> check_model()
 
 # got explanation for linear regression 
 
-tidy(lr_fit |> extract_fit_engine() |> summary()) |> ggplot() + geom_col(aes(x=reorder(term, abs(estimate)), y=abs(estimate))) + coord_flip()
+lr_fit |> extract_fit_engine() |> vip()
 
 ```
 
 ```{r}
 
-rf_fitted <- extract_fit_parsnip(rf_fit)
-
-tidy(rf_fitted$fit$variable.importance) |> ggplot() + geom_col(aes(x=reorder(names, x), y=x)) + coord_flip()
+rf_fit |> extract_fit_engine() |> vip()
 
 ```
+
+
+```{r}
+
+mean_tub <- mean(cleaned_merged_data$`Incidence of tuberculosis (per 10 000 population per year)`, na.rm = TRUE)
+
+# get binned tuberculosis based on mean
+cleaned_merged_data <- cleaned_merged_data |> mutate(binned_tuberculosis = if_else(`Incidence of tuberculosis (per 10 000 population per year)` > mean_tub, 1, 0)) |> filter(!is.na(binned_tuberculosis)) |> mutate(binned_tuberculosis = as.factor(binned_tuberculosis))
+
+data_for_model = cleaned_merged_data |> select(all_of(explanatory_feat), binned_tuberculosis)
+
+data_split <- initial_split(data_for_model, prop = 0.8, strata = binned_tuberculosis) # starte maintains proportion of binned tuberculosis in training and testing
+merged_data_train <- training(data_split)
+merged_data_test <- testing(data_split)
+
+```
+
+```{r}
+
+# recipe for classification
+
+imputed_rec <- recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_impute_mean(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+basic_rec <-recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_normalize(all_numeric_predictors())
+
+```
+
+```{r}
+
+# models
+
+# nb_model <- naive_Bayes(smoothness = tune()) |> set_engine("KlaR") |> set_mode("classification")
+knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("classification")
+rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("classification")
+xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("classification")
+lasso_model <- logistic_reg(penalty = tune(), mixture = 1) |> set_engine("glmnet") |> set_mode("classification")
+
+```
+
+```{r}
+
+# workflows
+
+# nb_workflow = workflow() |> add_model(nb_model) |> add_recipe(imputed_rec)
+rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(imputed_rec)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(basic_rec) # no need to impute
+knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(imputed_rec)
+lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(imputed_rec)
+
+```
+
+```{r}
+metrics <- metric_set(yardstick::accuracy, yardstick::precision, yardstick::recall, yardstick::f_meas) 
+```
+
+```{r}
+# cross validation for smoothness
+
+# cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+# smooth_grid <- tibble(smoothness = seq(1, 10, by = 1))
+
+# smooth_tune_results <- tune_grid(nb_workflow, resamples = cv_folds, grid = smooth_grid, metrics = metrics)
+
+# autoplot(smooth_tune_results)
+
+# best_smooth <- select_best(smooth_tune_results, metric = "accuracy")
+
+# final_knn_workflow <- finalize_workflow(nb_workflow, best_smooth)
+
+```
+
+```{r}
+# cross validation for k
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+knn_grid <- tibble(neighbors = seq(1, 30, by = 1))
+
+knn_tune_results <- tune_grid(
+  knn_workflow,
+  resamples = cv_folds,
+  grid = knn_grid,
+  metrics = metrics
+)
+
+autoplot(knn_tune_results)
+
+best_k <- select_best(knn_tune_results, metric = "accuracy")
+
+final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
+
+```
+```{r}
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+lasso_grid <- tibble(penalty = seq(0.0001, 1, by=0.01))
+
+lasso_grid <- grid_regular(penalty(), levels = 10)
+
+lasso_tune_results <- tune_grid(
+  lasso_workflow,
+  resamples = cv_folds,
+  grid = lasso_grid,
+  metrics = metrics
+)
+
+autoplot(lasso_tune_results)
+
+best_reg <- select_best(lasso_tune_results, metric = "accuracy")
+
+final_lasso_workflow <- finalize_workflow(lasso_workflow, best_reg)
+
+show_notes(lasso_tune_results)
+
+```
+
+```{r}
+
+# nb_fit  <- fit(nb_workflow, data = merged_data_train)
+rf_fit  <- fit(rf_workflow, data = merged_data_train)
+xgb_fit <- fit(xgb_workflow, data = merged_data_train)
+knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
+
+# nb_preds <- predict(nb_fit, merged_data_test) %>%
+  # bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  # mutate(model = "Linear")
+
+rf_preds <- predict(rf_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
+
+xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+
+knn_preds <- predict(knn_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
+
+lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+
+all_preds <- bind_rows(rf_preds, xgb_preds, knn_preds, lasso_preds) # nb_preds
+
+all_preds
+
+pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosis, estimate = .pred_class)
+
+# rmse: root mean square error
+# rsq: R^2
+# mae: mean absolute error
+
+```
+```{r}
+
+pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
+
+```
+
+```{r}
+
+xgb_fit |> extract_fit_engine() |> vip()
+
+```
+```{r}
+
+rf_fit |> extract_fit_engine() |> vip()
+
+```
+
+
+
 
 
 
