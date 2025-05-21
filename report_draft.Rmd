@@ -256,6 +256,8 @@ happiness_map <- c(
 
 ```
 
+
+
 Let's compare the features for 2017 of the top 10 countries by happiness in 2017, so as to get a good idea of what the "best" country is determined by. More specifically, let's have a look at those we have designated as outcome variables.
 
 ```{r}
