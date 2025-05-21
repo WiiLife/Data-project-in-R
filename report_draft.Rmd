@@ -84,7 +84,11 @@ tabacco_age_15 = read_csv("data/tobaccoAge15.csv") # consider removing, not medi
 head(medical_doctors_data, 5)
 ```
 
+<<<<<<< HEAD
+Note: many features correlate on a given model or prediction, so in many cases we will not use the totality of the data as the information in a given features may not be unique, and is found in other features for a specific use case.
+=======
 To make every research question meaningful, all data sets used to find experiments and answers belong to the same time periods. We will select relevant features and time periods appropriately.
+>>>>>>> 4e71988c7b749f93abfd11d10bdfd27d608f1808
 
 ## 4. Experiments and findings
 
