@@ -46,7 +46,30 @@ The data we chose is separated into many different files, each of which only con
 Our first step is to separate the features into variables we can use to evaluate the state of a country (outcome variables) and variables which influence the state of a country (decision variables). As an example, let's use the idea of getting to work on time: the outcome of "being on time" or "being late" depends on the decision variable "time of leaving the house". The decision to leave earlier may allow you to arrive on time to work, even if there are other variables that also influence the outcome like the presence of traffic.
 
 ```{r}
+# Packages
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(xgboost)
+
+library(glmnet)
+library(ranger)
+options(ranger.num.threads = 16)
+library(kknn)
+
+install.packages("glmnet")
+install.packages("glmnet", dependencies=TRUE, repos='http://cran.rstudio.com/')
+install.packages('glmnet',repos='http://cran.us.r-project.org')
+withCallingHandlers(install.packages("glmnet"),
+                    warning = function(w) stop(w))
+```
+
+```{r}
 #@title Importing the data, in its original divided state
+
+# Data
 
 # Outcome features
 infant_mortality_rate_data = read_csv("data/infantMortalityRate.csv")
@@ -61,7 +84,6 @@ crude_sucide_rates = read_csv("data/crudeSuicideRates.csv") # has to do with wel
 poison_mortality_rate = read_csv("data/mortalityRatePoisoning.csv") # consider removing, not altogether medical related
 road_traffic_deaths = read_csv("data/roadTrafficDeaths.csv") # consider removing, not medical related
 
-
 # Decision features
 medical_doctors_data = read_csv("data/medicalDoctors.csv")
 pharmacists_data = read_csv("data/pharmacists.csv")
@@ -75,7 +97,6 @@ sanitation_services = read_csv("data/safelySanitization.csv")
 clean_fuel_and_teck = read_csv("data/cleanFuelAndTech.csv") # consider removing, not medical related
 tabacco_age_15 = read_csv("data/tobaccoAge15.csv") # consider removing, not medical related
 
-
 # Note: many features correlate on a given model or prediction, so in many cases 
 # we will not use the totality of the data as the information in a given features 
 # may not be unique, and is found in other features for a specific use case.
@@ -84,222 +105,258 @@ tabacco_age_15 = read_csv("data/tobaccoAge15.csv") # consider removing, not medi
 head(medical_doctors_data, 5)
 ```
 
-<<<<<<< HEAD
+After loading the data, some cleaning is necessary before we can jump into exploration. We created a larger merged dataframe (tibble) to contain all the data we plan on using, and removed features with too little information or that are unsuitable.
+
+```{r}
+# function to remove indicator and rename `First Tooltip` to indicator feature name
+replace_inidcator_to_tooltip = function(tibble) {
+  df = tibble
+  feat_name = tibble$Indicator[1]
+  df = subset(df, select = - Indicator)
+  names(df)[names(df) == "First Tooltip"] <- feat_name
+  
+  return(df)
+}
+```
+
+```{r}
+
+# Manual overview of the data shows that
+# lowest year is 1962 
+# highest year is 2019
+
+# Creating an empty merged_data so we can add all the features from the datasets:
+
+# Manual overview of data reveals the following countries. 
+# Putting in a list to be used for table creation.
+countries = c(
+    "Afghanistan", "Albania", "Algeria", "Angola", "Antigua and Barbuda",
+    "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+    "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus",
+    "Belgium", "Belize", "Benin", "Bhutan", "Bolivia (Plurinational State of)",
+    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei Darussalam",
+    "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia",
+    "Cameroon", "Canada", "Central African Republic", "Chad", "Chile",
+    "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia",
+    "Cuba", "Cyprus", "Czechia", "Côte d'Ivoire", "Democratic People's Republic of Korea",
+    "Democratic Republic of the Congo", "Denmark", "Djibouti",
+    "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea",
+    "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland",
+    "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana",
+    "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau",
+    "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India",
+    "Indonesia", "Iran (Islamic Republic of)", "Iraq", "Ireland",
+    "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
+    "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Lao People's Democratic Republic",
+    "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Lithuania",
+    "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives",
+    "Mali", "Malta", "Mauritania", "Mauritius", "Mexico", "Micronesia (Federated States of)",
+    "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+    "Namibia", "Nepal", "Netherlands", "New Zealand", "Nicaragua",
+    "Niger", "Nigeria", "Norway", "Oman", "Pakistan", "Panama",
+    "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland",
+    "Portugal", "Qatar", "Republic of Korea", "Republic of Moldova",
+    "Romania", "Russian Federation", "Rwanda", "Saint Lucia",
+    "Saint Vincent and the Grenadines", "Samoa", "Sao Tome and Principe",
+    "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone",
+    "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia",
+    "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan",
+    "Sudan (until 2011)", "Suriname", "Sweden", "Switzerland",
+    "Syrian Arab Republic", "Tajikistan", "Thailand", "The former Yugoslav Republic of Macedonia",
+    "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia",
+    "Turkey", "Turkmenistan", "Uganda", "Ukraine", "United Arab Emirates",
+    "United Kingdom of Great Britain and Northern Ireland", "United Republic of Tanzania",
+    "United States of America", "Uruguay", "Uzbekistan", "Vanuatu",
+    "Venezuela (Bolivarian Republic of)", "Viet Nam", "Yemen",
+    "Zambia", "Zimbabwe", "Andorra", "Cook Islands", "Dominica",
+    "Marshall Islands", "Nauru", "Niue", "Palau", "Saint Kitts and Nevis",
+    "State of Palestine", "Tuvalu", "Monaco", "San Marino", "Germany, Federal Republic (former)",
+    "India (until 1975)", "Kiribati (until 1984)", "South Viet Nam (former)")
+
+years <- 2019:1962
+
+merged_data = tibble(Location=countries) |> mutate(Period = list(years)) |> unnest(Period)
+
+merged_data
+```
+
+```{r}
+# Pipelining each data set through data modifications it needs to become tidy
+medical_doctors_data = medical_doctors_data |> replace_inidcator_to_tooltip()
+birth_by_skilled_personel_data = birth_by_skilled_personel_data |> replace_inidcator_to_tooltip()
+life_expectency_at_birth_data = life_expectency_at_birth_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from=`Life expectancy at birth (years)`)
+pharmacists_data = pharmacists_data |> replace_inidcator_to_tooltip()
+infant_mortality_rate_data = infant_mortality_rate_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)`) |> mutate(across(c(`Both sexes`, Male, Female), ~ as.numeric(sub(" .*", "", .x))))
+maternal_mortality_ratio_data = maternal_mortality_ratio_data |> replace_inidcator_to_tooltip() |> mutate(across(`Maternal mortality ratio (per 100 000 live births)`, ~ as.numeric(sub(" .*", "", .x))))
+incidence_of_malaria_data = incidence_of_malaria_data |> replace_inidcator_to_tooltip()
+incidence_of_tuberculosis_data = incidence_of_tuberculosis_data |> replace_inidcator_to_tooltip() |> mutate(across(`Incidence of tuberculosis (per 100 000 population per year)`, ~ as.numeric(sub(" .*", "", .x))))
+
+# air_pollution_death_rate = air_pollution_death_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from = c(Dim1, Dim2), values_from = `First Tooltip`) |> replace_inidcator_to_tooltip()
+
+crude_sucide_rates = crude_sucide_rates |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+poison_mortality_rate = poison_mortality_rate |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+neo_natal_mortality_rate = neo_natal_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> replace_inidcator_to_tooltip() |> select(-c(Dim1))
+new_hiv_infections = new_hiv_infections |> drop_na() |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+road_traffic_deaths = road_traffic_deaths |> replace_inidcator_to_tooltip()
+under_5_mortality_rate = under_5_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+number_of_dentists = number_of_dentists |> replace_inidcator_to_tooltip()
+drinking_water_services = drinking_water_services |> replace_inidcator_to_tooltip()
+least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+basic_hand_washing = basic_hand_washing |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+clean_fuel_and_teck = clean_fuel_and_teck |> replace_inidcator_to_tooltip()
+tabacco_age_15 = tabacco_age_15  |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+nursing_services = nursing_services |> replace_inidcator_to_tooltip()
+sanitation_services = sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+
+```
+
+```{r}
+# Merging
+merged_data = full_join(merged_data, drinking_water_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, number_of_dentists, by=c("Location", "Period"))
+merged_data = full_join(merged_data, least_basic_sanitation_services |> rename(sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, basic_hand_washing |> rename(basic_hand_washing_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, tabacco_age_15 |> rename(tabacco_age_15=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, nursing_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, sanitation_services |> rename(total_sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, under_5_mortality_rate |> rename(under_5_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, road_traffic_deaths |> mutate(`Estimated road traffic death rate (per 10 000 population)`=`Estimated road traffic death rate (per 100 000 population)`/10) |> select(-c(`Estimated road traffic death rate (per 100 000 population)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, new_hiv_infections |> rename(hiv_infections=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, neo_natal_mortality_rate |> mutate(`Neonatal mortality rate (per 10 000 live births)`=`Neonatal mortality rate (per 1000 live births)`*10) |> select(-c(`Neonatal mortality rate (per 1000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, poison_mortality_rate |> rename(poison_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, crude_sucide_rates |> rename(sucide_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, life_expectency_at_birth_data |> rename(life_expectency_at_birth=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, birth_by_skilled_personel_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, medical_doctors_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, pharmacists_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, infant_mortality_rate_data |> rename(infant_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, maternal_mortality_ratio_data |> mutate(`Maternal mortality ratio (per 10 000 live births)`=`Maternal mortality ratio (per 100 000 live births)`*10) |> select(-c(`Maternal mortality ratio (per 100 000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_malaria_data |> mutate(`Malaria incidence (per 10 000 population at risk)`=`Malaria incidence (per 1 000 population at risk)`*10) |> select(-c(`Malaria incidence (per 1 000 population at risk)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`Incidence of tuberculosis (per 10 000 population per year)`=`Incidence of tuberculosis (per 100 000 population per year)`*10) |> select(-c(`Incidence of tuberculosis (per 100 000 population per year)`)), by=c("Location", "Period"))
+
+merged_data
+
+```
+
 Note: many features correlate on a given model or prediction, so in many cases we will not use the totality of the data as the information in a given features may not be unique, and is found in other features for a specific use case.
-=======
+
 To make every research question meaningful, all data sets used to find experiments and answers belong to the same time periods. We will select relevant features and time periods appropriately.
->>>>>>> 4e71988c7b749f93abfd11d10bdfd27d608f1808
 
 ## 4. Experiments and findings
 
+### 4.0 Preliminary data exploration
+
+The data we chose has many features that are interesting and can be related to each other. As a first glance at the world's well-being, we start by exploring a topic through similar features, to look for correlations and interesting information to note.
+
+
+```{r}
+# Features to select
+birth_features <- c("Location", 
+                    "Period", 
+                    "Nursing and midwifery personnel (per 10,000)", 
+                    "Births attended by skilled health personnel (%)",
+                    "under_5_mortality_rate", 
+                    "infant_mortality_rate",
+                    "Neonatal mortality rate (per 10 000 live births)",
+                    "Maternal mortality ratio (per 10 000 live births)")
+birth_data <- select(merged_data, birth_features)
+birth_data
+# Select only some years
+birth_data <- filter(birth_data, Period %in% 2000:2019)
+
+# Create the correlation matrix
+cor_matrix <- cor(birth_data[,3:8], use = "pairwise.complete.obs")
+
+# Show correlation matrix
+ggpairs(cor_matrix, progress=FALSE) # , method="spearman"
+
+```
+
+There are many missing values throughout the data. To combat this, we use different techniques throughout the project, trying to find an accurate representation of reality. 
+
+For this first look into the data, regarding child birth and mortality, we will instead use a simple method, by dividing the data into bins spanning a 5 year period and averaging the country's value for each feature across each bin.
+
+```{r}
+# Check how many null values in each column
+for (i in 1:length(birth_data)) {
+  print(sum(is.na(birth_data[,i])) / nrow(birth_data))} 
+# some columns have more than 50% missing values
+
+# we try: Bin the years
+
+# Create a new column that groups years into 5-year intervals
+binned_birth_data <- birth_data %>%
+  mutate(YearGroup = paste(floor((Period - min(Period)) / 5) * 5 + min(Period), "-", floor((Period - min(Period)) / 5) * 5 + min(Period) + 4))
+
+# group the tibble by the countries and the year bin, such that each feature value is the average over the years of that bin
+binned_birth_data <- binned_birth_data %>%
+  group_by(Location, YearGroup) %>%
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) %>%
+  select(!Period) # also remove the year
+
+# replace "NaN" with NA, null value for R
+binned_birth_data[binned_birth_data == "NaN"] <- NA
+binned_birth_data
+
+# Check if this helped with null values frequency
+for (i in 1:length(binned_birth_data)) {
+  print(sum(is.na(binned_birth_data[,i])) / nrow(binned_birth_data))} 
+# Now there is a lower frequency of missing values
+
+# Create the correlation matrix
+cor_matrix <- cor(binned_birth_data[,3:8], use = "pairwise.complete.obs")
+
+# Show correlation matrix
+ggpairs(cor_matrix, progress=FALSE)
+
+```
+Combating null values in this case did not give a more or less accurate model, so we will stick to the first correlation matrix to draw conclusions.
+
+From the correlation plot over the birth related medical features, we notice that there are a lot of clusters of data, and some very high correlations. When there are high correlations this leads us to believe the features may be related. We will explore this in one of our research questions.
+
 ### 4.1 Question 1
 
-Our first research question surrounds the general state of the countries in our data set. Can we determine what the best outcome for a country is and how it is affected by the available decision variables.
+#### What are the best outcomes for a country, and what are the primary influencing features for those outcomes?
 
-First of all we need to decide what is "the best" country. This could mean the least mortality, the highest life expectancy at birth, the least amount of suicides or many other things. To find an overall score for what could be the best, we selected the a recent year in the dataframe for which we have a good amount of data, and looked for that year's happiness index.
+Our first research question surrounds the general state of the countries in our data set. Can we determine what the best outcome for a country is and how it is affected by the available decision variables?
 
-Below is the list form of the happiness scores of the countries for which data was available in 2017, found at [vividmaps.com](https://vividmaps.com/happiness-index/).
+First of all we need to decide what is "the best" outcome. This could be represented by the least mortality, the highest life expectancy at birth, the least amount of suicides or many other things. To find an overall score for what could be the best, we selected the a recent year in the dataframe for which we have a good amount of data, and looked for that year's happiness index.
 
 ```{r}
-happiness_map <- c(
-  "Norway" =  7.537,
-  "Denmark" = 7.522,
-  "Iceland" = 7.504,
-  "Switzerland" = 7.494,
-  "Finland" = 7.469,
-  "Netherlands"= 7.377,
-  "Canada" = 7.316,
-  "New Zealand" = 7.314,
-  "Australia" = 7.284,
-  "Sweden" = 7.284,
-  "Israel" = 7.213,
-  "Costa Rica" = 7.079,
-  "Austria" = 7.006,
-  "United States" = 6.993,
-  "Ireland" = 6.977,
-  "Germany" = 6.951,
-  "Belgium" = 6.891,
-  "Luxembourg" = 6.863,
-  "United Kingdom" = 6.714,
-  "Chile" = 6.652,
-  "United Arab Emirates" = 6.648,
-  "Brazil" = 6.635,
-  "Czech Republic" = 6.609,
-  "Argentina" = 6.599,
-  "Mexico" = 6.578,
-  "Singapore" = 6.572,
-  "Malta" = 6.527,
-  "Uruguay" = 6.454,
-  "Guatemala" = 6.454,
-  "Panama" = 6.452,
-  "France" = 6.442,
-  "Thailand" = 6.424,
-  "Taiwan" = 6.422,
-  "Spain" = 6.403,
-  "Qatar" = 6.375,
-  "Colombia" = 6.357,
-  "Saudi Arabia" = 6.344,
-  "Trinidad and Tobago" = 6.168,
-  "Kuwait" = 6.105,
-  "Slovakia" = 6.098,
-  "Bahrain" = 6.087,
-  "Malaysia" = 6.084,
-  "Nicaragua" = 6.071,
-  "Ecuador" = 6.008,
-  "El Salvador" = 6.003,
-  "Poland" = 5.973,
-  "Uzbekistan" = 5.971,
-  "Italy" = 5.964,
-  "Russia" = 5.963,
-  "Belize" = 5.956,
-  "Japan" = 5.920,
-  "Lithuania" = 5.902,
-  "Algeria" = 5.872,
-  "Latvia" = 5.850,
-  "Moldova" = 5.838,
-  "South Korea" = 5.838,
-  "Romania" = 5.825,
-  "Bolivia" = 5.823,
-  "Turkmenistan" = 5.822,
-  "Kazakhstan" = 5.819,
-  "North Cyprus" = 5.810,
-  "Slovenia" = 5.758,
-  "Peru" = 5.715,
-  "Mauritius" = 5.629,
-  "Cyprus" = 5.621,
-  "Estonia" = 5.611,
-  "Belarus" = 5.569,
-  "Libya" = 5.525,
-  "Turkey" = 5.500,
-  "Paraguay" = 5.493,
-  "Hong Kong" = 5.472,
-  "Philippines" = 5.430,
-  "Serbia" = 5.395,
-  "Jordan" = 5.336,
-  "Hungary" = 5.324,
-  "Jamaica" = 5.311,
-  "Croatia" = 5.293,
-  "Kosovo" = 5.279,
-  "China" = 5.273,
-  "Pakistan" = 5.269,
-  "Indonesia" = 5.262,
-  "Venezuela" = 5.250,
-  "Montenegro" = 5.237,
-  "Morocco" = 5.235,
-  "Azerbaijan" = 5.234,
-  "Dominican Republic" = 5.230,
-  "Greece" = 5.227,
-  "Lebanon" = 5.225,
-  "Portugal" = 5.195,
-  "Bosnia and Herzegovina" = 5.182,
-  "Honduras" = 5.181,
-  "Macedonia" = 5.175,
-  "Somalia" = 5.151,
-  "Vietnam" = 5.074,
-  "Nigeria" = 5.074,
-  "Tajikistan" = 5.041,
-  "Bhutan" = 5.011,
-  "Kyrgyzstan" = 5.004,
-  "Nepal" = 4.962,
-  "Mongolia" = 4.955,
-  "South Africa" = 4.829,
-  "Tunisia" = 4.805,
-  "Palestinian Territories" = 4.775,
-  "Egypt" = 4.735,
-  "Bulgaria" = 4.714,
-  "Sierra Leone" = 4.709,
-  "Cameroon" = 4.695,
-  "Iran" = 4.692,
-  "Albania" = 4.644,
-  "Bangladesh" = 4.608,
-  "Namibia" = 4.574,
-  "Kenya" = 4.553,
-  "Mozambique" = 4.550,
-  "Myanmar" = 4.545,
-  "Senegal" = 4.535,
-  "Zambia" = 4.514,
-  "Iraq" = 4.497,
-  "Gabon" = 4.465,
-  "Ethiopia" = 4.460,
-  "Sri Lanka" = 4.440,
-  "Armenia" = 4.376,
-  "India" = 4.315,
-  "Mauritania" = 4.292,
-  "Congo (Brazzaville)" = 4.291,
-  "Georgia" = 4.286,
-  "Congo (Kinshasa)" = 4.280,
-  "Mali" = 4.190,
-  "Ivory Coast" = 4.180,
-  "Cambodia" = 4.168,
-  "Sudan" = 4.139,
-  "Ghana" = 4.120,
-  "Ukraine" = 4.096,
-  "Uganda" = 4.081,
-  "Burkina Faso" = 4.032,
-  "Niger" = 4.028,
-  "Malawi" = 3.970,
-  "Chad" = 3.936,
-  "Zimbabwe" = 3.875,
-  "Lesotho" = 3.808,
-  "Angola" = 3.795,
-  "Afghanistan" = 3.794,
-  "Botswana" = 3.766,
-  "Benin" = 3.657,
-  "Madagascar" = 3.644,
-  "Haiti" = 3.603,
-  "Yemen" = 3.593,
-  "South Sudan" = 3.591,
-  "Liberia" = 3.533,
-  "Guinea" = 3.507,
-  "Togo" = 3.495,
-  "Rwanda" = 3.471,
-  "Syria" = 3.462,
-  "Tanzania" = 3.349,
-  "Burundi" = 2.905,
-  "Central African Republic" = 2.693)
+for (year in 2000:2019) {
+  print(paste(year, sum(is.na(filter(merged_data, Period == year)))))
+}
 
 ```
 
-
-
-Let's compare the features for 2017 of the top 10 countries by happiness in 2017, so as to get a good idea of what the "best" country is determined by. More specifically, let's have a look at those we have designated as outcome variables.
+It seems that the years with least missing values since 2000 would be either 2010 or 2015. We chose 2015 because we hope that the quality increase due to the data being closer to the actual date negates the quality lost from the additional missing values. The top 10 countries by happiness index were recovered from [the World Happiness Report data](https://data.worldhappiness.report/table).
 
 ```{r}
+happy_countries <- c("Norway", "Switzerland", "Denmark", "Iceland", "Finland","Canada", "Netherlands", "New Zealand", "Australia", "Sweden")
 
-best_countries <- names(happiness_map)[1:10]
+for (year in 2000:2019) {
+  print(paste(year, sum(is.na(filter(merged_data, Period == year, Location %in% happy_countries)))))}
 
+# 2015 still a good value for the happy country data
 
+happy_countries <- filter(merged_data, Period == 2015, Location %in% happy_countries) 
+happy_countries
+
+# Let's look at a feature
+select(happy_countries, "Location", "life_expectency_at_birth")
 
 ```
 
+Let's compare the outcome feature values of the happiest countries in 2015 to the other countries.
+
+```{r}
+countries_2015 <- filter(merged_data, Period == 2015)
+countries_2015
+
+# pot bars with values for all countries
+# highlight area in which happy countries are
+
+```
 
 
 ## 5. Conclusion
-
-```{r setup, include=FALSE}
-# Imports for creating models and analysing data
-library("readr")
-library("dplyr")
-library("tidyverse")
-library("tidymodels")
-```
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
