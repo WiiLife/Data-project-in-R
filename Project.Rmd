@@ -505,7 +505,7 @@ cleaned_merged_data <- cleaned_merged_data |> mutate(binned_tuberculosis = if_el
 
 data_for_model = cleaned_merged_data |> select(all_of(explanatory_feat), binned_tuberculosis)
 
-data_split <- initial_split(data_for_model, prop = 0.8, strata = binned_tuberculosis) # starte maintains proportion of binned tuberculosis in training and testing
+data_split <- initial_split(data_for_model, prop = 0.8, strata = binned_tuberculosis) # strata maintains proportion of binned tuberculosis in training and testing
 merged_data_train <- training(data_split)
 merged_data_test <- testing(data_split)
 
@@ -631,22 +631,34 @@ lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
 rf_preds <- predict(rf_fit, merged_data_test) %>%
   bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
   mutate(model = "Random Forest")
+rf_preds_prob <- predict(rf_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
 
 xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+xgb_preds_prob <- predict(xgb_fit, merged_data_test, type = "prob") %>%
   bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
   mutate(model = "XGBoost")
 
 knn_preds <- predict(knn_fit, merged_data_test) %>%
   bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
   mutate(model = "Knn")
+knn_preds_prob <- predict(knn_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
 
 lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+lasso_preds_prob <- predict(lasso_fit, merged_data_test, type = "prob") %>%
   bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
   mutate(model = "Lasso")
 
 all_preds <- bind_rows(rf_preds, xgb_preds, knn_preds, lasso_preds) # nb_preds
 
-all_preds
+all_preds_prob = bind_rows(rf_preds_prob, xgb_preds_prob, knn_preds_prob, lasso_preds_prob)
 
 pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosis, estimate = .pred_class)
 
@@ -660,13 +672,35 @@ pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosi
 pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
 
 ```
+```{r}
+
+for (m in unique(all_preds$model)) {
+  cm = all_preds |> filter(model == m) |> conf_mat(truth = binned_tuberculosis, .pred_class) |> autoplot(type = "heatmap")
+  print(cm)
+}
+
+```
 
 ```{r}
+
+for (m in unique(all_preds$model)) {
+  
+  roc_curve = all_preds_prob |> filter(model == m) |> roc_curve(truth = binned_tuberculosis, .pred_0) |> autoplot() + ggtitle(paste("ROC Curve -", m))
+  print(roc_curve)
+}
+
+```
+
+```{r}
+
+# xgb model
 
 xgb_fit |> extract_fit_engine() |> vip()
 
 ```
 ```{r}
+
+# random forest 
 
 rf_fit |> extract_fit_engine() |> vip()
 
