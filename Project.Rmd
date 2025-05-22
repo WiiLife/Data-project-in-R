@@ -760,6 +760,7 @@ importance_df <- rf_fit |> extract_fit_engine() |> vip::vi()
 
 # we want to rank the countries based on a score we give it which is the sum of the scaled features weighted by their importance found from our model
 # do for both infant mortality and tuberculosis 
+# outliers really affect the score
 
 
 importance_probs <- importance_df |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
@@ -785,7 +786,11 @@ health_risk_score <- weighted_data |>
   group_by(Location) |>
   summarise(score = sum(weighted_value, na.rm = TRUE))
 
+# top 10
 health_risk_score |> arrange(score) |> tail(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col() + coord_flip()
+
+# least 10
+health_risk_score |> arrange(score) |> head(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col() + coord_flip()
 
 ```
 
