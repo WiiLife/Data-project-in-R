@@ -53,21 +53,15 @@ library(tidyverse)
 library(tidymodels)
 library(GGally)
 library(xgboost)
+library(glmnet)
+library(ranger)
+options(ranger.num.threads = 16)
+library(kknn)
 
-# library(glmnet)
-# library(ranger)
-# options(ranger.num.threads = 16)
-# library(kknn)
-
-# install.packages("glmnet")
-# install.packages("glmnet", dependencies=TRUE, repos='http://cran.rstudio.com/')
-# install.packages('glmnet',repos='http://cran.us.r-project.org')
-# withCallingHandlers(install.packages("glmnet"),
-#                     warning = function(w) stop(w))
 ```
 
 ```{r}
-#@title Importing the data, in its original divided state
+#Importing the data, one feature dataframe at a time
 
 # Data
 
@@ -246,8 +240,7 @@ To make every research question meaningful, all data sets used to find experimen
 
 ### 4.0 Preliminary data exploration
 
-Using our invented setting, that we are benevolent aliens preparing to help some of Earth's countries better the quality of life of their people, we need to start by informing ourselves of Earth's situation. Looking first at the bigger picture we will have a better idea of how to approach the more specific questions.
-We understand that each country has its own borders and can decide for itself how to operate inside of those borders, so we need to know in which ways they are similar and in which they are different.
+Using our invented setting, that we are benevolent aliens preparing to help some of Earth's countries better the quality of life of their people, we need to start by informing ourselves of Earth's situation. Looking first at the bigger picture we will have a better idea of how to approach the more specific questions. We understand that each country has its own borders and can decide for itself how to operate inside of those borders, so we need to know in which ways they are similar and in which they are different.
 
 Knowing that we want to compare each country's outcome features and their decision or explanatory features, we start our explorations phase by comparing outcome features. we build a correlation matrix and look at the overall data, just to give ourselves an idea of where to start looking for the optimal features of a country.
 
@@ -283,8 +276,7 @@ We can notice some initial trends in the data, where many of these outcomes are 
 
 Since many outcomes are correlated we are led to guess that these are highly influenced by the explanatory features, and even if we remove some outcome features we will be able to accurately predict which countries are performing better (well-being wise) based on those we keep.
 
-Having said these, we move onto a second part of data cleaning: if we want to provide usable and reality-based answers to our research questions, we need the data to be a good representation of real life, but also for it to be consistent and clean. 
-For this reason, we explore the missing values and usable data.
+Having said these, we move onto a second part of data cleaning: if we want to provide usable and reality-based answers to our research questions, we need the data to be a good representation of real life, but also for it to be consistent and clean. For this reason, we explore the missing values and usable data.
 
 At first we will decide what to keep based on data availability, by removing rows or columns (entries or features) with too many non existent values.
 
@@ -346,7 +338,6 @@ We decide to keep only the years for which we have the most data, and the same l
 
 Of the original 11 outcome variables we end up keeping 6. We are OK with this because as we discussed earlier, the outcomes are correlated enough with each other to still give a decent overview.
 
-
 ### 4.1 Question 1
 
 #### What are the best outcomes for a country, and what are the primary influencing features for those outcomes?
@@ -371,8 +362,8 @@ cleaned_cor_matrix <- cor(cleaned_merged_data[outcome_feat], use = "pairwise.com
 # Show correlation matrix
 ggpairs(cleaned_cor_matrix, progress=FALSE)
 ```
-Next let's select the happiest countries for a given year. Using the amount of missing data per each year, we select a suitable candidate which is also preferably close in time to the current date of May 2025, and visualise the top 10 countries by happiness of that year.
 
+Next let's select the happiest countries for a given year. Using the amount of missing data per each year, we select a suitable candidate which is also preferably close in time to the current date of May 2025, and visualise the top 10 countries by happiness of that year.
 
 ```{r}
 for (year in 2000:2019) {
@@ -403,28 +394,63 @@ select(happy_countries_2015, "Location", "infant_mortality_rate")
 
 Having found the happiest countries for a given date, let's compare the outcomes of the top 10 countries in 2015 to the outcomes of the other countries. Since the happiness index is calculated in the same way no matter the year, this should give us the idea of what statistics to look out for overall.
 
-
 ```{r}
 cleaned_countries_2015 <- filter(cleaned_merged_data, Period == 2015)
 countries_2015
 
 ```
 
-
 ```{r}
 
 # bar plot of every country's outcome features 
 
+ # plot every country feat 
+#   make it into barplot (horizontal)
+  
+#  colour any coutry with value between min and max
+  
+  
+# -> best outcome variable is infant mortality
+
+country_col <- "Location"  # Replace with your actual country name column
+
 for (feat in outcome_feat) {
-  print(feat)
-  if (any(!is.na(happy_countries_2015[[feat]]))) {
-    min_value = min(happy_countries_2015[feat])
-    max_value = max(happy_countries_2015[feat])
-    print(min_value, max_value)
-  }
+  cat("Plotting:", feat, "\n")
+
+  # Skip if all values are NA
+  if (all(is.na(happy_countries_2015[[feat]]))) next
+
+  # Extract feature values and remove NA rows
+  df_feat <- cleaned_countries_2015[, c(country_col, feat)]
+  df_feat <- df_feat[!is.na(df_feat[[feat]]), ]
+
+  # Define min and max
+  min_value <- min(happy_countries_2015[, c(country_col, feat)][[feat]])
+  max_value <- max(happy_countries_2015[, c(country_col, feat)][[feat]])
+
+  # Add highlight column
+  df_feat$highlight <- ifelse(df_feat[[feat]] > min_value & df_feat[[feat]] < max_value, "In Range", "Min/Max")
+
+  # Reorder factor levels for plotting
+  df_feat[[country_col]] <- factor(df_feat[[country_col]], levels = df_feat[[country_col]][order(df_feat[[feat]])])
+
+  # Plot using tidy evaluation
+  p <- ggplot(df_feat, aes(x = .data[[country_col]], y = .data[[feat]], fill = highlight)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_fill_manual(values = c("In Range" = "skyblue", "Min/Max" = "gray")) +
+    labs(title = paste("Feature:", feat),
+         x = "Country", y = feat) +
+    theme_minimal()
+
+  print(p)
 }
 
 
+```
+
+
+```{r}
 
 
 # Sample data
@@ -445,21 +471,7 @@ ggplot(data, aes(x = category, y = value)) +
   theme_minimal() +
   labs(title = "Bar Plot with Shaded Area", x = "Category", y = "Value")
 
-
-
-
-
-
-
 ```
-
-
-
-
-
-
-
-
 
 
 
@@ -468,9 +480,6 @@ ggplot(data, aes(x = category, y = value)) +
 ggpairs(cleaned_merged_data |> select(`Dentists (per 10,000)`, `Pharmacists  (per 10,000)`, `Medical doctors (per 10,000)`) |> drop_na(), progress = F)
 
 ```
-
-
-
 
 Next we very generically look at the correlations between outcome and decision features. This will allow us to ignore certain features in the future, because the more correlated features are, the less new information they are giving us.
 
@@ -518,6 +527,7 @@ cor_matrix
 ggpairs(cor_matrix, progress=FALSE)
 
 ```
+
 ```{r}
 cleaned_countries_2015 <- filter(merged_data_clean, Period == 2015)
 
@@ -543,17 +553,9 @@ correlation(cor_matrix_clean)
 cleaned_merged_data[outcome_feat_clean]
 ```
 
-
 ## 5. Conclusion
 
-
-
-
-
-
-
 The data still has many features that are interesting and can be related to each other. As a first glance at the world's well-being, we start by exploring a topic through similar features, to look for correlations and interesting information to note.
-
 
 ```{r}
 # Features to select
@@ -580,7 +582,7 @@ ggpairs(cor_matrix, progress=FALSE) # , method="spearman"
 
 From the correlation plot over the birth related medical features, we notice that there are a lot of clusters of data, and some very high correlations. When there are high correlations this leads us to believe the features may be related. We will explore this in one of our research questions.
 
-There are many missing values throughout the data. To combat this, we use different techniques throughout the project, trying to find an accurate representation of reality. 
+There are many missing values throughout the data. To combat this, we use different techniques throughout the project, trying to find an accurate representation of reality.
 
 For this first look into the data, regarding child birth and mortality, we will instead use a simple method, by dividing the data into bins spanning a 5 year period and averaging the country's value for each feature across each bin.
 
@@ -618,8 +620,5 @@ cor_matrix <- cor(binned_birth_data[,3:8], use = "pairwise.complete.obs")
 ggpairs(cor_matrix, progress=FALSE)
 
 ```
+
 Combating null values in this case did not give a more or less accurate model, so we will stick to the first correlation matrix to draw conclusions.
-
-
-
-
