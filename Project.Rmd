@@ -292,12 +292,28 @@ cleaned_merged_data <- merged_data %>%
   select(all_of(valid_features))
 
 ```
-```{r}
+```{r, fig.width=10, fig.height10}
 
+feat_data = cleaned_merged_data |> select(-c(Location, Period))
 
+rec <- recipe(~ ., data = feat_data) |>
+  step_normalize(all_numeric_predictors()) |> 
+  prep()
+
+feat_data = bake(rec, new_data = NULL) |> pivot_longer(cols = everything(), names_to = "features", values_to = "values")
+
+feat_data |> ggplot(aes(x = features, y = values)) + geom_boxplot() + coord_flip()
 
 
 ```
+```{r}
+
+cleaned_merged_data |> select(`Nursing and midwifery personnel (per 10,000)`) |> drop_na() |> ggplot(aes(x = "Nursing and midwifery personnel (per 10,000)", y = `Nursing and midwifery personnel (per 10,000)`)) + geom_boxplot()
+
+cleaned_merged_data |> select(Location, Period, `Nursing and midwifery personnel (per 10,000)`) |> filter(`Nursing and midwifery personnel (per 10,000)` >= 1000)
+
+```
+
 
 ```{r}
 
