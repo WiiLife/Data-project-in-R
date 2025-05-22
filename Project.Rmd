@@ -299,37 +299,6 @@ explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
 
 ```
 
-```{r}
-
-# get correlation between each pair of features and get the top 5 pairs
-
-numeric_data <- cleaned_merged_data %>% 
-  select(c(explanatory_feat)) %>%
-  select(where(is.numeric))
-
-cor_matrix <- cor(numeric_data, use = "pairwise.complete.obs")
-
-cor_long <- cor_matrix %>%
-  as_tibble(rownames = "feature1") %>%
-  pivot_longer(-feature1, names_to = "feature2", values_to = "correlation") %>%
-  filter(feature1 != feature2) %>%
-  mutate(pair = map2_chr(feature1, feature2, ~ paste(sort(c(.x, .y)), collapse = "___"))) %>%
-  distinct(pair, .keep_all = TRUE) %>%
-  select(-pair)
-
-top_5_corr <- cor_long %>%
-  arrange(desc(abs(correlation))) %>%
-  slice_head(n = 10)
-
-```
-
-```{r}
-
-# remove most correlated outcome features
-
-cleaned_merged_data = cleaned_merged_data |> select(-c(under_5_mortality_rate, `Neonatal mortality rate (per 10 000 live births)`, `Neonatal mortality rate (per 10 000 live births)`))
-```
-
 ```{r, fig.width=10, fig.height=6}
 
 # ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> drop_na(), progress = F)
