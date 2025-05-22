@@ -338,6 +338,10 @@ cleaned_merged_data <- merged_data %>%
 
 ```
 
+```{r}
+
+```
+
 We decide to keep only the years for which we have the most data, and the same logic applies to the features. We set an arbitrary value for number of missing values to accept for the features, set at 3000 so as to remove the ones with the most missing values, but still keep enough of the original features to make interesting explorations with.
 
 Of the original 11 outcome variables we end up keeping 6. We are OK with this because as we discussed earlier, the outcomes are correlated enough with each other to still give a decent overview.
@@ -354,22 +358,15 @@ First of all we need to decide what is "the best" outcome. This could be represe
 Since we have cleaned the data since doing the preliminary data exploration, let's look at the new outcome correlations.
 
 ```{r}
-cleaned_outcome_feat = c("Maternal mortality ratio (per 10 000 live births)",
-                         "Neonatal mortality rate (per 10 000 live births)", 
-                         "infant_mortality_rate",
-                         "under_5_mortality_rate", 
-                         "Malaria incidence (per 10 000 population at risk)", 
-                         "Incidence of tuberculosis (per 10 000 population per year)")
-
-cleaned_explanatory_feat = setdiff(colnames(cleaned_merged_data), outcome_feat)
-cleaned_explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
+# new outcome and explanatory features
+explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
+outcome_feat = intersect(outcome_feat, names(cleaned_merged_data))
 
 # visualise outcome features of all data
-cleaned_merged_data[cleaned_outcome_feat]
+cleaned_merged_data[outcome_feat]
 
 # correlate the outcome features
-cleaned_cor_matrix <- cor(cleaned_merged_data[cleaned_outcome_feat], use = "pairwise.complete.obs")
-cleaned_cor_matrix
+cleaned_cor_matrix <- cor(cleaned_merged_data[outcome_feat], use = "pairwise.complete.obs")
 
 # Show correlation matrix
 ggpairs(cleaned_cor_matrix, progress=FALSE)
@@ -399,7 +396,7 @@ happy_countries_list <- c("Norway", "Switzerland", "Denmark", "Iceland", "Finlan
 happy_countries_2015 <- filter(cleaned_merged_data, Period == 2015, Location %in% happy_countries_list) 
 happy_countries_2015
 
-# Let's look at a feature
+# Let's look at a random feature
 select(happy_countries_2015, "Location", "infant_mortality_rate")
 
 ```
@@ -414,6 +411,47 @@ countries_2015
 ```
 
 
+```{r}
+
+# bar plot of every country's outcome features 
+
+for (feat in outcome_feat) {
+  print(feat)
+  if (any(!is.na(happy_countries_2015[[feat]]))) {
+    min_value = min(happy_countries_2015[feat])
+    max_value = max(happy_countries_2015[feat])
+    print(min_value, max_value)
+  }
+}
+
+
+
+
+# Sample data
+data <- data.frame(
+  category = c("A", "B", "C", "D"),
+  value = c(10, 15, 7, 20)
+)
+
+data
+
+# Create the plot
+ggplot(data, aes(x = category, y = value)) +
+  # Add shaded area
+  geom_rect(aes(xmin = as.numeric(category) - 0.5, xmax = as.numeric(category) + 0.5,
+                ymin = 0, ymax = value), fill = "lightblue", alpha = 0.5) +
+  # Add bars
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Bar Plot with Shaded Area", x = "Category", y = "Value")
+
+
+
+
+
+
+
+```
 
 
 
@@ -423,6 +461,13 @@ countries_2015
 
 
 
+
+
+```{r}
+
+ggpairs(cleaned_merged_data |> select(`Dentists (per 10,000)`, `Pharmacists  (per 10,000)`, `Medical doctors (per 10,000)`) |> drop_na(), progress = F)
+
+```
 
 
 
