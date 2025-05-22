@@ -296,20 +296,34 @@ cleaned_merged_data <- merged_data %>%
 ```{r}
 
 explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
+outcome_feat = intersect(outcome_feat, names(cleaned_merged_data))
 
 ```
 
-```{r, fig.width=10, fig.height=6}
+```{r, fig.width=12, fig.height=10}
 
-# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> drop_na(), progress = F)
+ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na(), progress = F)
+
+ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na(), progress = F)
+
 
 ```
+
+
+
+
+
+
+
+
+
+
 
 ```{r}
 
 explanatory_feat_infant_mortality = c(explanatory_feat, "infant_mortality_rate")
 
-merged_train_test_split = cleaned_merged_data |> select(explanatory_feat_infant_mortality) |> filter(!is.na(infant_mortality_rate)) |> initial_split(prop=0.8)
+merged_train_test_split = cleaned_merged_data |> select(all_of(explanatory_feat_infant_mortality)) |> filter(!is.na(infant_mortality_rate)) |> initial_split(prop=0.8)
 
 merged_data_train = training(merged_train_test_split)
 merged_data_test = testing(merged_train_test_split)
@@ -486,7 +500,7 @@ merged_data_test <- testing(data_split)
 
 imputed_rec <- recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
   step_impute_mean(all_numeric_predictors()) |>
-  step_impute_mode(all_nominal_predictors()) |>
+  # step_impute_mode(all_nominal_predictors()) |>
   step_normalize(all_numeric_predictors())
 
 basic_rec <-recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
