@@ -54,16 +54,16 @@ library(tidymodels)
 library(GGally)
 library(xgboost)
 
-library(glmnet)
-library(ranger)
-options(ranger.num.threads = 16)
-library(kknn)
+# library(glmnet)
+# library(ranger)
+# options(ranger.num.threads = 16)
+# library(kknn)
 
-install.packages("glmnet")
-install.packages("glmnet", dependencies=TRUE, repos='http://cran.rstudio.com/')
-install.packages('glmnet',repos='http://cran.us.r-project.org')
-withCallingHandlers(install.packages("glmnet"),
-                    warning = function(w) stop(w))
+# install.packages("glmnet")
+# install.packages("glmnet", dependencies=TRUE, repos='http://cran.rstudio.com/')
+# install.packages('glmnet',repos='http://cran.us.r-project.org')
+# withCallingHandlers(install.packages("glmnet"),
+#                     warning = function(w) stop(w))
 ```
 
 ```{r}
@@ -238,6 +238,16 @@ merged_data
 
 ```
 
+
+```{r}
+# Designmating the outcome vs decision variables, aka explanatory features (they provide explanations about the outcome features)
+outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria incidence (per 10 000 population at risk)", "Incidence of tuberculosis (per 10 000 population per year)", "under_5_mortality_rate", "Estimated road traffic death rate (per 10 000 population)", "hiv_infections", "Neonatal mortality rate (per 10 000 live births)", "poison_mortality_rate", "sucide_rate", "life_expectency_at_birth", "infant_mortality_rate")
+
+explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
+explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
+```
+
+
 Note: many features correlate on a given model or prediction, so in many cases we will not use the totality of the data as the information in a given features may not be unique, and is found in other features for a specific use case.
 
 To make every research question meaningful, all data sets used to find experiments and answers belong to the same time periods. We will select relevant features and time periods appropriately.
@@ -246,7 +256,63 @@ To make every research question meaningful, all data sets used to find experimen
 
 ### 4.0 Preliminary data exploration
 
-The data we chose has many features that are interesting and can be related to each other. As a first glance at the world's well-being, we start by exploring a topic through similar features, to look for correlations and interesting information to note.
+Before we can start seriously working on the data, we need to know it's usable. At first we will decide what to keep based on data availability, by removing rows or columns (entries or features) with too many non existent values.
+
+Let's visualise the number of missing datapoints by year, and then by feature, to obtain a more usable set of data.
+
+```{r}
+# More data cleaning
+non_na_per_period <- merged_data %>% select(-c(Location)) %>%
+  rowwise() %>%
+  mutate(non_na_count = sum(!is.na(c_across(where(~ !is.list(.x)))))) %>%
+  ungroup() %>%
+  group_by(Period) %>%
+  summarise(total_non_na = sum(non_na_count))
+
+# Here we plot number of not NA values by year of the data
+ggplot(non_na_per_period, aes(x = Period, y = total_non_na)) +
+  geom_col(fill = "seagreen") +
+  labs(title = "Total Non-NA Values per Period",
+       x = "Year",
+       y = "Non-NA Value Count") +
+  theme_minimal()
+
+# From the outputs we can see there is a lot more data available after the year 2000, and the data before would be difficult to use.
+# Lets keep the data only from 2000 onward
+merged_data = merged_data |> filter(Period >= 2000)
+
+# Here we plot the count of NA values per feature, for the segment of data we decided to keep 
+na_counts <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count")
+
+ggplot(na_counts, aes(x = reorder(feature, na_count), y = na_count)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(title = "NA Values per Feature",
+       x = "Feature",
+       y = "NA Count") +
+  theme_minimal()
+
+# We set an arbitrary limit to the number of NA values per feature at 3000, so as to remove the most difficult cases
+# but not remove too much of the data
+valid_features <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count") %>%
+  filter(na_count < 3000) %>%
+  pull(feature)
+
+# Finally creating the new cleaned data 
+cleaned_merged_data <- merged_data %>%
+  select(all_of(valid_features))
+
+```
+
+
+We decide to keep only the years for which we have the most data, and the same logic applies to the features. We set an arbitrary value for number of missing values to accept for the features, set at 3000 so as to remove the ones with the most missing values, but still keep enough of the original features to make interesting explorations with.
+
+
+The data still has many features that are interesting and can be related to each other. As a first glance at the world's well-being, we start by exploring a topic through similar features, to look for correlations and interesting information to note.
 
 
 ```{r}
@@ -259,7 +325,7 @@ birth_features <- c("Location",
                     "infant_mortality_rate",
                     "Neonatal mortality rate (per 10 000 live births)",
                     "Maternal mortality ratio (per 10 000 live births)")
-birth_data <- select(merged_data, birth_features)
+birth_data <- select(cleaned_merged_data, birth_features)
 birth_data
 # Select only some years
 birth_data <- filter(birth_data, Period %in% 2000:2019)
@@ -312,6 +378,10 @@ ggpairs(cor_matrix, progress=FALSE)
 ```
 Combating null values in this case did not give a more or less accurate model, so we will stick to the first correlation matrix to draw conclusions.
 
+
+
+
+
 From the correlation plot over the birth related medical features, we notice that there are a lot of clusters of data, and some very high correlations. When there are high correlations this leads us to believe the features may be related. We will explore this in one of our research questions.
 
 ### 4.1 Question 1
@@ -322,9 +392,16 @@ Our first research question surrounds the general state of the countries in our 
 
 First of all we need to decide what is "the best" outcome. This could be represented by the least mortality, the highest life expectancy at birth, the least amount of suicides or many other things. To find an overall score for what could be the best, we selected the a recent year in the dataframe for which we have a good amount of data, and looked for that year's happiness index.
 
+
+
+Next we very generically look at the correlations between outcome and decision features. This will allow us to ignore certain features in the future, because the more correlated features are, the less new information they are giving us.
+
+
+
+
 ```{r}
 for (year in 2000:2019) {
-  print(paste(year, sum(is.na(filter(merged_data, Period == year)))))
+  print(paste(year, sum(is.na(filter(cleaned_merged_data, Period == year)))))
 }
 
 ```
@@ -332,14 +409,16 @@ for (year in 2000:2019) {
 It seems that the years with least missing values since 2000 would be either 2010 or 2015. We chose 2015 because we hope that the quality increase due to the data being closer to the actual date negates the quality lost from the additional missing values. The top 10 countries by happiness index were recovered from [the World Happiness Report data](https://data.worldhappiness.report/table).
 
 ```{r}
-happy_countries <- c("Norway", "Switzerland", "Denmark", "Iceland", "Finland","Canada", "Netherlands", "New Zealand", "Australia", "Sweden")
+happy_countries_list <- c("Norway", "Switzerland", "Denmark", "Iceland", "Finland","Canada", "Netherlands", "New Zealand", "Australia", "Sweden")
 
 for (year in 2000:2019) {
-  print(paste(year, sum(is.na(filter(merged_data, Period == year, Location %in% happy_countries)))))}
+  print(paste(year, sum(is.na(filter(merged_data, Period == year, Location %in% happy_countries_list)))))}
 
 # 2015 still a good value for the happy country data
 
-happy_countries <- filter(merged_data, Period == 2015, Location %in% happy_countries) 
+happy_countries_cleaned <- filter(cleaned_merged_data, Period == 2015, Location %in% happy_countries_list) 
+happy_countries <- filter(merged_data, Period == 2015, Location %in% happy_countries_list) 
+happy_countries_cleaned
 happy_countries
 
 # Let's look at a feature
@@ -353,9 +432,67 @@ Let's compare the outcome feature values of the happiest countries in 2015 to th
 countries_2015 <- filter(merged_data, Period == 2015)
 countries_2015
 
+outcome_feat = c("life_expectency_at_birth",
+                 "Maternal mortality ratio (per 10 000 live births)", 
+                 "Neonatal mortality rate (per 10 000 live births)", 
+                 "infant_mortality_rate",
+                 "under_5_mortality_rate", 
+                 #"Malaria incidence (per 10 000 population at risk)", 
+                 "Incidence of tuberculosis (per 10 000 population per year)", 
+                 "hiv_infections", 
+                 "sucide_rate", 
+                 "poison_mortality_rate")
+                 #"Estimated road traffic death rate (per 10 000 population)")
+
+
+
+explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
+explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
+
+happy_countries[outcome_feat]
+
+
 # pot bars with values for all countries
 # highlight area in which happy countries are
 
+# correlation between outcomes and explanatory features
+
+# idea: infant mortality and everyting else
+
+
+# outcomes corr outcomes
+drop_na(happy_countries[outcome_feat])
+
+cor_matrix <- cor(happy_countries[outcome_feat], use = "pairwise.complete.obs")
+drop_na(cor_matrix)
+cor_matrix
+# Show correlation matrix
+ggpairs(cor_matrix, progress=FALSE)
+
+```
+```{r}
+cleaned_countries_2015 <- filter(merged_data_clean, Period == 2015)
+
+cleaned_merged_data
+
+
+outcome_feat_clean = c("Maternal mortality ratio (per 10 000 live births)", 
+                      "Neonatal mortality rate (per 10 000 live births)", 
+                      "infant_mortality_rate",
+                      "under_5_mortality_rate")
+
+happy_countries_cleaned[outcome_feat_clean]
+
+cor_matrix_clean <- cor(happy_countries_cleaned[outcome_feat_clean], use = "pairwise.complete.obs")
+cor_matrix_clean <- cor(cleaned_merged_data[outcome_feat_clean], use = "pairwise.complete.obs")
+cor_matrix_clean
+
+ggpairs(cor_matrix_clean, progress=FALSE)
+
+library(correlation)
+correlation(cor_matrix_clean)
+
+cleaned_merged_data[outcome_feat_clean]
 ```
 
 
