@@ -6,7 +6,7 @@ date: "2025-05-20"
 
 # Data Projects & Hackathon
 
-## Project: The coool project
+## Project: Worldwide Well-being
 
 ### Authors: [William Ambrosetti](https://github.com/WiiLife), [Alexandra Biddiscombe](https://github.com/ambiddisco), [Youssef Sedra](https://github.com/ysedra)
 
@@ -328,6 +328,8 @@ valid_features <- merged_data %>%
 cleaned_merged_data <- merged_data %>%
   select(all_of(valid_features))
 
+cleaned_merged_data
+
 ```
 
 ```{r}
@@ -377,7 +379,7 @@ A good date to explore is 2015, although there are fewer missing values in 2010,
 The top 10 countries by happiness index were recovered from [the World Happiness Report data](https://data.worldhappiness.report/table).
 
 ```{r}
-happy_countries_list <- c("Norway", "Switzerland", "Denmark", "Iceland", "Finland","Canada", "Netherlands", "New Zealand", "Australia", "Sweden")
+happy_countries_list <- c("Norway", "Switzerland", "Denmark", "Iceland", "Finland", "Canada", "Netherlands", "New Zealand", "Australia", "Sweden")
 
 # for (year in 2000:2019) {
 #   print(paste(year, sum(is.na(filter(merged_data, Period == year, Location %in% happy_countries_list)))))}
@@ -396,11 +398,11 @@ Having found the happiest countries for a given date, let's compare the outcomes
 
 ```{r}
 cleaned_countries_2015 <- filter(cleaned_merged_data, Period == 2015)
-countries_2015
+cleaned_countries_2015
 
 ```
 
-```{r}
+```{r, fig.width=15, fig.height=20}
 
 # bar plot of every country's outcome features 
 
@@ -424,21 +426,20 @@ for (feat in outcome_feat) {
   df_feat <- cleaned_countries_2015[, c(country_col, feat)]
   df_feat <- df_feat[!is.na(df_feat[[feat]]), ]
 
-  # Define min and max
+  # Define min and max for each feature
   min_value <- min(happy_countries_2015[, c(country_col, feat)][[feat]])
   max_value <- max(happy_countries_2015[, c(country_col, feat)][[feat]])
 
-  # Add highlight column
-  df_feat$highlight <- ifelse(df_feat[[feat]] > min_value & df_feat[[feat]] < max_value, "In Range", "Min/Max")
+  # evaluating whether column in best region or not
+  df_feat$highlight <- ifelse(df_feat[[feat]] >= min_value & df_feat[[feat]] <= max_value, "In Range", "Out Of Range")
 
   # Reorder factor levels for plotting
-  df_feat[[country_col]] <- factor(df_feat[[country_col]], levels = df_feat[[country_col]][order(df_feat[[feat]])])
+  df_feat[[country_col]] <- factor(df_feat[[country_col]], levels = df_feat[[country_col]][order(df_feat[[feat]], decreasing = TRUE)])
 
-  # Plot using tidy evaluation
   p <- ggplot(df_feat, aes(x = .data[[country_col]], y = .data[[feat]], fill = highlight)) +
     geom_bar(stat = "identity") +
     coord_flip() +
-    scale_fill_manual(values = c("In Range" = "skyblue", "Min/Max" = "gray")) +
+    scale_fill_manual(values = c("In Range" = "skyblue", "Out Of Range" = "tomato")) +
     labs(title = paste("Feature:", feat),
          x = "Country", y = feat) +
     theme_minimal()
@@ -447,33 +448,8 @@ for (feat in outcome_feat) {
 }
 
 
-```
-
-
-```{r}
-
-
-# Sample data
-data <- data.frame(
-  category = c("A", "B", "C", "D"),
-  value = c(10, 15, 7, 20)
-)
-
-data
-
-# Create the plot
-ggplot(data, aes(x = category, y = value)) +
-  # Add shaded area
-  geom_rect(aes(xmin = as.numeric(category) - 0.5, xmax = as.numeric(category) + 0.5,
-                ymin = 0, ymax = value), fill = "lightblue", alpha = 0.5) +
-  # Add bars
-  geom_bar(stat = "identity", fill = "steelblue") +
-  theme_minimal() +
-  labs(title = "Bar Plot with Shaded Area", x = "Category", y = "Value")
 
 ```
-
-
 
 ```{r}
 
