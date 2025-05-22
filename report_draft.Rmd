@@ -238,16 +238,6 @@ merged_data
 
 ```
 
-
-```{r}
-# Designmating the outcome vs decision variables, aka explanatory features (they provide explanations about the outcome features)
-outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria incidence (per 10 000 population at risk)", "Incidence of tuberculosis (per 10 000 population per year)", "under_5_mortality_rate", "Estimated road traffic death rate (per 10 000 population)", "hiv_infections", "Neonatal mortality rate (per 10 000 live births)", "poison_mortality_rate", "sucide_rate", "life_expectency_at_birth", "infant_mortality_rate")
-
-explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
-explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
-```
-
-
 Note: many features correlate on a given model or prediction, so in many cases we will not use the totality of the data as the information in a given features may not be unique, and is found in other features for a specific use case.
 
 To make every research question meaningful, all data sets used to find experiments and answers belong to the same time periods. We will select relevant features and time periods appropriately.
@@ -256,7 +246,47 @@ To make every research question meaningful, all data sets used to find experimen
 
 ### 4.0 Preliminary data exploration
 
-Before we can start seriously working on the data, we need to know it's usable. At first we will decide what to keep based on data availability, by removing rows or columns (entries or features) with too many non existent values.
+Using our invented setting, that we are benevolent aliens preparing to help some of Earth's countries better the quality of life of their people, we need to start by informing ourselves of Earth's situation. Looking first at the bigger picture we will have a better idea of how to approach the more specific questions.
+We understand that each country has its own borders and can decide for itself how to operate inside of those borders, so we need to know in which ways they are similar and in which they are different.
+
+Knowing that we want to compare each country's outcome features and their decision or explanatory features, we start our explorations phase by comparing outcome features. we build a correlation matrix and look at the overall data, just to give ourselves an idea of where to start looking for the optimal features of a country.
+
+```{r}
+outcome_feat = c("life_expectency_at_birth",
+                 "Maternal mortality ratio (per 10 000 live births)", 
+                 "Neonatal mortality rate (per 10 000 live births)", 
+                 "infant_mortality_rate",
+                 "under_5_mortality_rate", 
+                 "Malaria incidence (per 10 000 population at risk)", 
+                 "Incidence of tuberculosis (per 10 000 population per year)", 
+                 "hiv_infections", 
+                 "sucide_rate", 
+                 "poison_mortality_rate",
+                 "Estimated road traffic death rate (per 10 000 population)")
+
+explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
+explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
+
+# visualise outcome features of all data
+merged_data[outcome_feat]
+
+# correlate the outcome features
+cor_matrix <- cor(merged_data[outcome_feat], use = "pairwise.complete.obs")
+cor_matrix
+
+# Show correlation matrix
+ggpairs(cor_matrix, progress=FALSE)
+
+```
+
+We can notice some initial trends in the data, where many of these outcomes are correlated to each other in significant ways. For instance, let's look at the first column, which contains data about the life expectancy at birth: it is very correlated to all the other outcomes, in fact 5 correlations show a coefficient of 0.9 or above.
+
+Since many outcomes are correlated we are led to guess that these are highly influenced by the explanatory features, and even if we remove some outcome features we will be able to accurately predict which countries are performing better (well-being wise) based on those we keep.
+
+Having said these, we move onto a second part of data cleaning: if we want to provide usable and reality-based answers to our research questions, we need the data to be a good representation of real life, but also for it to be consistent and clean. 
+For this reason, we explore the missing values and usable data.
+
+At first we will decide what to keep based on data availability, by removing rows or columns (entries or features) with too many non existent values.
 
 Let's visualise the number of missing datapoints by year, and then by feature, to obtain a more usable set of data.
 
@@ -308,81 +338,10 @@ cleaned_merged_data <- merged_data %>%
 
 ```
 
-
 We decide to keep only the years for which we have the most data, and the same logic applies to the features. We set an arbitrary value for number of missing values to accept for the features, set at 3000 so as to remove the ones with the most missing values, but still keep enough of the original features to make interesting explorations with.
 
+Of the original 11 outcome variables we end up keeping 6. We are OK with this because as we discussed earlier, the outcomes are correlated enough with each other to still give a decent overview.
 
-The data still has many features that are interesting and can be related to each other. As a first glance at the world's well-being, we start by exploring a topic through similar features, to look for correlations and interesting information to note.
-
-
-```{r}
-# Features to select
-birth_features <- c("Location", 
-                    "Period", 
-                    "Nursing and midwifery personnel (per 10,000)", 
-                    "Births attended by skilled health personnel (%)",
-                    "under_5_mortality_rate", 
-                    "infant_mortality_rate",
-                    "Neonatal mortality rate (per 10 000 live births)",
-                    "Maternal mortality ratio (per 10 000 live births)")
-birth_data <- select(cleaned_merged_data, birth_features)
-birth_data
-# Select only some years
-birth_data <- filter(birth_data, Period %in% 2000:2019)
-
-# Create the correlation matrix
-cor_matrix <- cor(birth_data[,3:8], use = "pairwise.complete.obs")
-
-# Show correlation matrix
-ggpairs(cor_matrix, progress=FALSE) # , method="spearman"
-
-```
-
-There are many missing values throughout the data. To combat this, we use different techniques throughout the project, trying to find an accurate representation of reality. 
-
-For this first look into the data, regarding child birth and mortality, we will instead use a simple method, by dividing the data into bins spanning a 5 year period and averaging the country's value for each feature across each bin.
-
-```{r}
-# Check how many null values in each column
-for (i in 1:length(birth_data)) {
-  print(sum(is.na(birth_data[,i])) / nrow(birth_data))} 
-# some columns have more than 50% missing values
-
-# we try: Bin the years
-
-# Create a new column that groups years into 5-year intervals
-binned_birth_data <- birth_data %>%
-  mutate(YearGroup = paste(floor((Period - min(Period)) / 5) * 5 + min(Period), "-", floor((Period - min(Period)) / 5) * 5 + min(Period) + 4))
-
-# group the tibble by the countries and the year bin, such that each feature value is the average over the years of that bin
-binned_birth_data <- binned_birth_data %>%
-  group_by(Location, YearGroup) %>%
-  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) %>%
-  select(!Period) # also remove the year
-
-# replace "NaN" with NA, null value for R
-binned_birth_data[binned_birth_data == "NaN"] <- NA
-binned_birth_data
-
-# Check if this helped with null values frequency
-for (i in 1:length(binned_birth_data)) {
-  print(sum(is.na(binned_birth_data[,i])) / nrow(binned_birth_data))} 
-# Now there is a lower frequency of missing values
-
-# Create the correlation matrix
-cor_matrix <- cor(binned_birth_data[,3:8], use = "pairwise.complete.obs")
-
-# Show correlation matrix
-ggpairs(cor_matrix, progress=FALSE)
-
-```
-Combating null values in this case did not give a more or less accurate model, so we will stick to the first correlation matrix to draw conclusions.
-
-
-
-
-
-From the correlation plot over the birth related medical features, we notice that there are a lot of clusters of data, and some very high correlations. When there are high correlations this leads us to believe the features may be related. We will explore this in one of our research questions.
 
 ### 4.1 Question 1
 
@@ -392,11 +351,30 @@ Our first research question surrounds the general state of the countries in our 
 
 First of all we need to decide what is "the best" outcome. This could be represented by the least mortality, the highest life expectancy at birth, the least amount of suicides or many other things. To find an overall score for what could be the best, we selected the a recent year in the dataframe for which we have a good amount of data, and looked for that year's happiness index.
 
+Since we have cleaned the data since doing the preliminary data exploration, let's look at the new outcome correlations.
 
+```{r}
+cleaned_outcome_feat = c("Maternal mortality ratio (per 10 000 live births)",
+                         "Neonatal mortality rate (per 10 000 live births)", 
+                         "infant_mortality_rate",
+                         "under_5_mortality_rate", 
+                         "Malaria incidence (per 10 000 population at risk)", 
+                         "Incidence of tuberculosis (per 10 000 population per year)")
 
-Next we very generically look at the correlations between outcome and decision features. This will allow us to ignore certain features in the future, because the more correlated features are, the less new information they are giving us.
+cleaned_explanatory_feat = setdiff(colnames(cleaned_merged_data), outcome_feat)
+cleaned_explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
 
+# visualise outcome features of all data
+cleaned_merged_data[cleaned_outcome_feat]
 
+# correlate the outcome features
+cleaned_cor_matrix <- cor(cleaned_merged_data[cleaned_outcome_feat], use = "pairwise.complete.obs")
+cleaned_cor_matrix
+
+# Show correlation matrix
+ggpairs(cleaned_cor_matrix, progress=FALSE)
+```
+Next let's select the happiest countries for a given year. Using the amount of missing data per each year, we select a suitable candidate which is also preferably close in time to the current date of May 2025, and visualise the top 10 countries by happiness of that year.
 
 
 ```{r}
@@ -406,25 +384,50 @@ for (year in 2000:2019) {
 
 ```
 
-It seems that the years with least missing values since 2000 would be either 2010 or 2015. We chose 2015 because we hope that the quality increase due to the data being closer to the actual date negates the quality lost from the additional missing values. The top 10 countries by happiness index were recovered from [the World Happiness Report data](https://data.worldhappiness.report/table).
+A good date to explore is 2015, although there are fewer missing values in 2010, 2015 is closer to the actual date.
+
+The top 10 countries by happiness index were recovered from [the World Happiness Report data](https://data.worldhappiness.report/table).
 
 ```{r}
 happy_countries_list <- c("Norway", "Switzerland", "Denmark", "Iceland", "Finland","Canada", "Netherlands", "New Zealand", "Australia", "Sweden")
 
-for (year in 2000:2019) {
-  print(paste(year, sum(is.na(filter(merged_data, Period == year, Location %in% happy_countries_list)))))}
+# for (year in 2000:2019) {
+#   print(paste(year, sum(is.na(filter(merged_data, Period == year, Location %in% happy_countries_list)))))}
 
 # 2015 still a good value for the happy country data
 
-happy_countries_cleaned <- filter(cleaned_merged_data, Period == 2015, Location %in% happy_countries_list) 
-happy_countries <- filter(merged_data, Period == 2015, Location %in% happy_countries_list) 
-happy_countries_cleaned
-happy_countries
+happy_countries_2015 <- filter(cleaned_merged_data, Period == 2015, Location %in% happy_countries_list) 
+happy_countries_2015
 
 # Let's look at a feature
-select(happy_countries, "Location", "life_expectency_at_birth")
+select(happy_countries_2015, "Location", "infant_mortality_rate")
 
 ```
+
+Having found the happiest countries for a given date, let's compare the outcomes of the top 10 countries in 2015 to the outcomes of the other countries. Since the happiness index is calculated in the same way no matter the year, this should give us the idea of what statistics to look out for overall.
+
+
+```{r}
+cleaned_countries_2015 <- filter(cleaned_merged_data, Period == 2015)
+countries_2015
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Next we very generically look at the correlations between outcome and decision features. This will allow us to ignore certain features in the future, because the more correlated features are, the less new information they are giving us.
 
 Let's compare the outcome feature values of the happiest countries in 2015 to the other countries.
 
@@ -497,3 +500,81 @@ cleaned_merged_data[outcome_feat_clean]
 
 
 ## 5. Conclusion
+
+
+
+
+
+
+
+The data still has many features that are interesting and can be related to each other. As a first glance at the world's well-being, we start by exploring a topic through similar features, to look for correlations and interesting information to note.
+
+
+```{r}
+# Features to select
+birth_features <- c("Location", 
+                    "Period", 
+                    "Nursing and midwifery personnel (per 10,000)", 
+                    "Births attended by skilled health personnel (%)",
+                    "under_5_mortality_rate", 
+                    "infant_mortality_rate",
+                    "Neonatal mortality rate (per 10 000 live births)",
+                    "Maternal mortality ratio (per 10 000 live births)")
+birth_data <- select(cleaned_merged_data, birth_features)
+birth_data
+# Select only some years
+birth_data <- filter(birth_data, Period %in% 2000:2019)
+
+# Create the correlation matrix
+cor_matrix <- cor(birth_data[,3:8], use = "pairwise.complete.obs")
+
+# Show correlation matrix
+ggpairs(cor_matrix, progress=FALSE) # , method="spearman"
+
+```
+
+From the correlation plot over the birth related medical features, we notice that there are a lot of clusters of data, and some very high correlations. When there are high correlations this leads us to believe the features may be related. We will explore this in one of our research questions.
+
+There are many missing values throughout the data. To combat this, we use different techniques throughout the project, trying to find an accurate representation of reality. 
+
+For this first look into the data, regarding child birth and mortality, we will instead use a simple method, by dividing the data into bins spanning a 5 year period and averaging the country's value for each feature across each bin.
+
+```{r}
+# Check how many null values in each column
+for (i in 1:length(birth_data)) {
+  print(sum(is.na(birth_data[,i])) / nrow(birth_data))} 
+# some columns have more than 50% missing values
+
+# we try: Bin the years
+
+# Create a new column that groups years into 5-year intervals
+binned_birth_data <- birth_data %>%
+  mutate(YearGroup = paste(floor((Period - min(Period)) / 5) * 5 + min(Period), "-", floor((Period - min(Period)) / 5) * 5 + min(Period) + 4))
+
+# group the tibble by the countries and the year bin, such that each feature value is the average over the years of that bin
+binned_birth_data <- binned_birth_data %>%
+  group_by(Location, YearGroup) %>%
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) %>%
+  select(!Period) # also remove the year
+
+# replace "NaN" with NA, null value for R
+binned_birth_data[binned_birth_data == "NaN"] <- NA
+binned_birth_data
+
+# Check if this helped with null values frequency
+for (i in 1:length(binned_birth_data)) {
+  print(sum(is.na(binned_birth_data[,i])) / nrow(binned_birth_data))} 
+# Now there is a lower frequency of missing values
+
+# Create the correlation matrix
+cor_matrix <- cor(binned_birth_data[,3:8], use = "pairwise.complete.obs")
+
+# Show correlation matrix
+ggpairs(cor_matrix, progress=FALSE)
+
+```
+Combating null values in this case did not give a more or less accurate model, so we will stick to the first correlation matrix to draw conclusions.
+
+
+
+
