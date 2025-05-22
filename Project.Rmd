@@ -296,20 +296,53 @@ cleaned_merged_data <- merged_data %>%
 ```{r}
 
 explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
+outcome_feat = intersect(outcome_feat, names(cleaned_merged_data))
 
 ```
 
-```{r, fig.width=10, fig.height=6}
+```{r, fig.width=12, fig.height=10}
 
-# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> drop_na(), progress = F)
+ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na(), progress = F)
+
+ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na(), progress = F)
+
+# correlation between outcome variables is pretty high meaning if we predict for ex. infant mortality we know pretty well how to predict other outcome variables
+# this is true for most variables except for tuberculosis and malaria
+# for the sake of time we only predict classification of tuberculosis
 
 ```
+
+```{r, fig.width=20, fig.height=10}
+
+summary_data <- cleaned_merged_data |>
+  group_by(Period) |>
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) |>
+  ungroup()
+
+summary_long <- summary_data |>
+  pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
+
+summary_long |> ggplot(aes(x = Period, y = mean_value, colour = feature)) + geom_point() + geom_line()
+
+
+```
+```{r}
+
+names(cleaned_merged_data)
+
+country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(desc(mean_infant_mortalilty)) |> head(5)
+
+
+country_infant_mortality |> ggplot(aes(x = Location, y = mean_infant_mortalilty)) + geom_col()
+
+```
+
 
 ```{r}
 
 explanatory_feat_infant_mortality = c(explanatory_feat, "infant_mortality_rate")
 
-merged_train_test_split = cleaned_merged_data |> select(explanatory_feat_infant_mortality) |> filter(!is.na(infant_mortality_rate)) |> initial_split(prop=0.8)
+merged_train_test_split = cleaned_merged_data |> select(all_of(explanatory_feat_infant_mortality)) |> filter(!is.na(infant_mortality_rate)) |> initial_split(prop=0.8)
 
 merged_data_train = training(merged_train_test_split)
 merged_data_test = testing(merged_train_test_split)
@@ -486,7 +519,7 @@ merged_data_test <- testing(data_split)
 
 imputed_rec <- recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
   step_impute_mean(all_numeric_predictors()) |>
-  step_impute_mode(all_nominal_predictors()) |>
+  # step_impute_mode(all_nominal_predictors()) |>
   step_normalize(all_numeric_predictors())
 
 basic_rec <-recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
