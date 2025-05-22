@@ -312,6 +312,12 @@ cleaned_merged_data |> select(`Nursing and midwifery personnel (per 10,000)`) |>
 
 cleaned_merged_data |> select(Location, Period, `Nursing and midwifery personnel (per 10,000)`) |> filter(`Nursing and midwifery personnel (per 10,000)` >= 1000)
 
+# outliers
+
+outliers = cleaned_merged_data |> filter(`Nursing and midwifery personnel (per 10,000)` > 1500)
+
+cleaned_merged_data = cleaned_merged_data |> anti_join(outliers, by = "Location")
+
 ```
 
 
@@ -351,6 +357,8 @@ summary_long <- summary_data |>
   pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
 
 summary_long |> ggplot(aes(x = Period, y = mean_value, colour = feature)) + geom_point() + geom_line()
+
+summary_long
 
 
 ```
@@ -752,19 +760,21 @@ importance_df <- rf_fit |> extract_fit_engine() |> vip::vi()
 
 # we want to rank the countries based on a score we give it which is the sum of the scaled features weighted by their importance found from our model
 # do for both infant mortality and tuberculosis 
+# outliers really affect the score
 
 
 importance_probs <- importance_df |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
 importnace_probs1 <- importance_df1 |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
 importance_probs  = importance_probs |> rename(scaled_tub = scaled)
 
+# got feature weight by doing the mean of both importnace scores from both the models for tuberculosis and infant mortality
 feat_weight = bind_cols(importance_probs |> select(Variable, scaled_tub), importnace_probs1 |> select(scaled)) |> mutate(new_weight = (scaled_tub + scaled) / (sum(scaled_tub) + sum(scaled))) |> select(Variable, new_weight)
 
-
+# got mean off all features by all the periods and scaled the features
 mean_featu_by_country = cleaned_merged_data |> group_by(Location) |> summarise(across(where(is.numeric) & !matches("Period"), ~ mean(.x, na.rm = TRUE)))
 scaled_mean_feat_country = mean_featu_by_country |> mutate(across(explanatory_feat, scale)) |> select(Location, explanatory_feat) |> mutate(across(everything(), ~ ifelse(is.nan(.), 0, .)))
 
-
+# did a weighted sum of all the scaled features with the weight computed
 long_data <- mean_featu_by_country |>
   pivot_longer(cols = -Location, names_to = "Variable", values_to = "value")
 
@@ -776,20 +786,12 @@ health_risk_score <- weighted_data |>
   group_by(Location) |>
   summarise(score = sum(weighted_value, na.rm = TRUE))
 
+# top 10
 health_risk_score |> arrange(score) |> tail(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col() + coord_flip()
 
+# least 10
+health_risk_score |> arrange(score) |> head(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col() + coord_flip()
+
 ```
-
-
-
-
-
-
-
-
-
-
-
-
 
 
