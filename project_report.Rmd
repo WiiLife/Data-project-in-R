@@ -26,7 +26,13 @@ To embody this strange feeling we have decided to take this metaphor literally a
 
 ### 2.1 Research quesions
 
-We will frame this report around the following questions, moving from a more generic to a more specific subject: - From the perspective of aliens approaching Earth, what constitutes the best country and how can we categorize it? - What constitute the biggest health risks? - From the perspective of the leader of a country, what is the best way to improve the quality of life of my citizens? - Are there specific features which can determine the overall well-being of a country? - From the perspective of a person looking to settle down, where is the best country to move to? - How can I ensure my children have the best chance of growing up healthy and happy?
+We will frame this report around the following questions, moving from a more generic to a more specific subject: 
+-   From the perspective of aliens approaching Earth, what constitutes the best country and how can we categorize it? 
+-   What constitute the biggest health risks? 
+-   From the perspective of the leader of a country, what is the best way to improve the quality of life of my citizens? 
+-   Are there specific features which can determine the overall well-being of a country? 
+-   From the perspective of a person looking to settle down, where is the best country to move to? 
+-   How can I ensure my children have the best chance of growing up healthy and happy?
 
 If we go back to the proposed metaphor, this journey would look like an approach towards Earth, an exploration of its most important features from far away, before landing on the planet and looking in more detail at the decisions to be made. Without the metaphor, this would simply represent the steps necessary to complete a proper exploration of data with the intent of finding appropriate conclusions.
 
@@ -46,7 +52,7 @@ For one of the questions we also recovered some countries from [the World Happin
 
 We started by selecting 22 data sets that describe well-being of the people, including medical data, accessibility to infrastructure, deaths related to a selection of causes, and similar. This data was then loaded into a single table, and labeled according to whether it is a decision - also known as explanatory - feature, or an outcome feature. What is meant by this is whether a feature can be described as a decision a country makes, such as the number of medical professionals employed, whereas outcomes indicate finality, such as deaths or the number of people that ended up catching a disease. The decision variables can also be called explanatory, as they can be used to explain how an outcome came to be, for example if we were to take the case of a person going to work: the time at which they leave their house is an explanatory feature, and the time they arrive at work is an outcome, since if they arrive late it can be explained by the fact they left late.
 
-After choosing and separating the features, we have 22 columns divided into 11 outcomes and 11 explanatory features. The features initially had some values per 10 000 inhabitants and some per 100'000 or 1'000, so we adjusted all to be per 10'000 so the data is neater. The list of features and their meaning follows:
+After choosing and separating the features, we have 22 columns divided into 11 outcomes and 9 explanatory features, plus the country and the year at which the data was recorded. The features initially had some values per 10 000 inhabitants and some per 100'000 or 1'000, so we adjusted all to be per 10'000 so the data is neater. The list of features and their meaning follows:
 
 Outcome features:
 
@@ -66,7 +72,7 @@ Explanation features:
 
 -   **Medical doctors (per 10,000)** : Medical doctors per 10 000 population;
 -   **Dentists (per 10,000)** : Dentists per 10,000 population;
--   **Pharmacists (per 10,000)** : Phrarmacists per 10,000 population;
+-   **Pharmacists (per 10,000)** : Pharmacists per 10,000 population;
 -   **Nursing and midwifery personnel (per 10,000)** : Nursing and midwifery personnel per 10 000 population;
 -   **Births attended by skilled health personnel (%)** : Births attended by skilled personals (percentile);
 -   **Population using at least basic drinking-water services (%)** : Population using at least basic drinking water services (%);
@@ -83,3 +89,30 @@ The size of the data table is determined by the number of countries (200) and th
 To minimise this issue, we looked at missing data by year and removed the worst period, keeping data only after the year 2'000, then looking at the missing values per feature and choosing to reject any features with more than a limit of 3'000 missing points, set at that number to not remove too many features and still keep the data usable.
 This means removing 6 features, of which 5 outcomes, so to verify that we are not losing too much information we visualised some initial correlation plots between all outcome features, verifying high values of correlation between the columns to be removed and those kept, thus ensuring not too much information is lost.
 
+We are left with the following 16 features, divided into 6 outcome, 8 explanatory and 2 that represent the country and year of the data's recording.
+
+
+-   **Maternal mortality ratio (per 10 000 live births)** : The number of mothers who die during or after birth, per 10 000 people;
+-   **Neonatal mortality rate (per 10 000 live births)** : The number of newborns who die in the first 28 days after birth, per 10 000 people;
+-   **infant_mortality_rate** : The number of children that die between birth and 1 year after birth, per 10 000 people;
+-   **under_5_mortality_rate** : The number of children that die between birth and 5 years after birth, per 10 000 people;
+-   **Malaria incidence (per 10 000 population at risk)** : The number of cases of malaria per 10 000 people;
+-   **Incidence of tuberculosis (per 10 000 population per year)** : The number of cases of tuberculosis per 10 000 people;
+
+Explanation features:
+
+-   **Medical doctors (per 10,000)** : Medical doctors per 10 000 population;
+-   **Dentists (per 10,000)** : Dentists per 10,000 population;
+-   **Pharmacists (per 10,000)** : Pharmacists per 10,000 population;
+-   **Nursing and midwifery personnel (per 10,000)** : Nursing and midwifery personnel per 10 000 population;
+-   **Births attended by skilled health personnel (%)** : Births attended by skilled personals (percentile);
+-   **Population using at least basic drinking-water services (%)** : Population using at least basic drinking water services (%);
+-   **total_sanitation_services** : Population using safe sanitation services (%);
+-   **tabacco_age_15** : Prevalence of tobacco use among persons aged 15 years and older (age- standardized rate).
+
+All data is still divided and stored by country and by year:
+
+-   **Location** : The country in which the value described was recorded;
+-   **Period** : The year in which the value described was recorded.
+
+We proceeded to perform some ulterior cleaning, 
