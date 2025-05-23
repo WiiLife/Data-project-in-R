@@ -511,6 +511,8 @@ pred_tibble = all_preds %>%
 
 pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
 
+pred_tibble
+
 ```
 ```{r, fig.width=10, fig.height=6}
 
@@ -713,6 +715,8 @@ pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosi
 ```{r}
 
 pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble
 
 ```
 ```{r}
