@@ -20,29 +20,26 @@ We approach these questions from the perspective of well-meaning but not complet
 
 As students of data science, soon to be data scientists, we are expected to learn and implement decision making processes in the face of many different sources of data, and many different requests. The idea of trying to find a logical string of conclusions from a completely unknown topic is daunting, almost alien to us right now, but it is a reality of our chosen profession.
 
-To embody this strange feeling we have decided to take this metaphor literally and approach a world full of data as outsiders, trying to draw conclusions that we hope will be accurate and helpful. For a brief presentation, we will be well-meaning aliens analysing planet Earth in the hopes of helping its inhabitants.
+We will look at a large generalisation of data by asking and answering questions about the world as a whole, from the general idea of "What makes up the best living conditions for a person?" to the more specific "Where should I move to for the best chance at a healthy future for my family?".
 
 ## 2. Data
 
-### 2.1 Research quesions
+### 2.1 Research questions
 
-We will frame this report around the following questions, moving from a more generic to a more specific subject: 
--   From the perspective of aliens approaching Earth, what constitutes the best country and how can we categorize it? 
--   What constitute the biggest health risks? 
--   From the perspective of the leader of a country, what is the best way to improve the quality of life of my citizens? 
--   Are there specific features which can determine the overall well-being of a country? 
--   From the perspective of a person looking to settle down, where is the best country to move to? 
--   How can I ensure my children have the best chance of growing up healthy and happy?
+We frame our questions as if asked by the CEO of a successful company, looking to relocate their headquarters to a new area, so as to guarantee the highest quality of life for their workers and their family.
 
-If we go back to the proposed metaphor, this journey would look like an approach towards Earth, an exploration of its most important features from far away, before landing on the planet and looking in more detail at the decisions to be made. Without the metaphor, this would simply represent the steps necessary to complete a proper exploration of data with the intent of finding appropriate conclusions.
+We will frame this report around the following questions, moving from a more generic to a more specific subject:
 
-### 2.2 Data sources
-
-We decided to use WHO data, statistics we have not yet looked at and are on the whole unfamiliar with.
+-   What indicators can we use to determine the best country, by quality of life?
+-   Which are the best countries, by quality of life?
+-   Is there a large difference in countries from different regions of the world, say between an African country and a European one?
+-   Where would be the best place to move with the intent to start a family?
 
 ### 2.2 Data sources
 
-The data sets we chose represent data from the WHO, found on [Kaggle](https://kaggle.com) at [World Health Statistics 2020 \| Complete \| Geo-Analysis](https://www.kaggle.com/datasets/utkarshxy/who-worldhealth-statistics-2020-complete), curated by [Zeus](https://www.kaggle.com/utkarshxy).
+The data sets we chose represent data from the WHO, found on [Kaggle](https://kaggle.com) at [World Health Statistics 2020 \| Complete \| Geo-Analysis](https://www.kaggle.com/datasets/utkarshxy/who-worldhealth-statistics-2020-complete), curated by [Zeus](https://www.kaggle.com/utkarshxy). 
+We attempted to complete as much of the analysis as possible without using external data sets. 
+Below are any additional data we ended up using, for additional research and validation purposes.
 
 The data is separated into many different files, each of which only contains only one feature describing the state of the world, divided by country and by year. To use data like this, we need to determine which are the most relevant features for our research questions and how to evaluate them.
 
@@ -85,12 +82,9 @@ All data is divided and stored by country and by year:
 -   **Location** : The country in which the value described was recorded;
 -   **Period** : The year in which the value described was recorded.
 
-The size of the data table is determined by the number of countries (200) and the timespan (1962 - 2019) for a total of 11'400 rows and 22 columns. Of these, 40'806 are missing values. The missing data needs to be dealt with before any real answers can be properly explored.
-To minimise this issue, we looked at missing data by year and removed the worst period, keeping data only after the year 2'000, then looking at the missing values per feature and choosing to reject any features with more than a limit of 3'000 missing points, set at that number to not remove too many features and still keep the data usable.
-This means removing 6 features, of which 5 outcomes, so to verify that we are not losing too much information we visualised some initial correlation plots between all outcome features, verifying high values of correlation between the columns to be removed and those kept, thus ensuring not too much information is lost.
+The size of the data table is determined by the number of countries (200) and the timespan (1962 - 2019) for a total of 11'600 rows and 22 columns. Of these, 200'000 are missing values. The missing data needs to be dealt with before any real answers can be properly explored. To minimise this issue, we looked at missing data by year and removed the worst period, keeping data only after the year 2'000, then looking at the missing values per feature and choosing to reject any features with more than a limit of 3'000 missing points, set at that number to not remove too many features and still keep the data usable. This means removing 6 features, of which 5 outcomes, so to verify that we are not losing too much information we visualised some initial correlation plots between all outcome features, verifying high values of correlation between the columns to be removed and those kept, thus ensuring not too much information is lost.
 
 We are left with the following 16 features, divided into 6 outcome, 8 explanatory and 2 that represent the country and year of the data's recording.
-
 
 -   **Maternal mortality ratio (per 10 000 live births)** : The number of mothers who die during or after birth, per 10 000 people;
 -   **Neonatal mortality rate (per 10 000 live births)** : The number of newborns who die in the first 28 days after birth, per 10 000 people;
@@ -115,4 +109,8 @@ All data is still divided and stored by country and by year:
 -   **Location** : The country in which the value described was recorded;
 -   **Period** : The year in which the value described was recorded.
 
-We proceeded to perform some ulterior cleaning, 
+We proceeded to perform some ulterior cleaning, by normalising all the data and plotting the outliers. After noticing a strange phenomenon in number of nurses, where the number of recorded nurses in Belize approached 3'000 per 10'000 people, we decided to remove it before continuing to the rest of the exploration, because it had a negative effect on the model performances.
+
+### 2.4 Data exploration
+
+To inform ourselves about the general data distribution, we started by plotting the the average of each feature by year, hoping to see a linear progression towards better quality of life. This showed us that mortality rates have been steadily decreasing, access to sanitation has not had the greatest change over time, and rates of disease have slowly but surely lessened over time. From this graph we determined it was important to select some features as the most important with which to judge a country. How can we select which is the best country to live in if we cannot determine what features make up the best country? For this purpose we

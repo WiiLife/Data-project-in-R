@@ -230,6 +230,8 @@ merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`I
 
 merged_data
 
+sum(is.na(merged_data))
+
 ```
 
 Note: many features correlate on a given model or prediction, so in many cases we will not use the totality of the data as the information in a given features may not be unique, and is found in other features for a specific use case.
@@ -260,6 +262,7 @@ outcome_feat = c("life_expectency_at_birth",
 explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
 explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
 
+explanatory_feat
 # visualise outcome features of all data
 merged_data[outcome_feat]
 
