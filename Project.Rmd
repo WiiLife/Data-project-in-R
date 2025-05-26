@@ -336,30 +336,29 @@ outcome_feat = intersect(outcome_feat, names(cleaned_merged_data))
 
 ```{r, fig.width=12, fig.height=10}
 
-ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na(), progress = F)
+# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na(), progress = F)
 
-ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na(), progress = F)
+# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na(), progress = F)
 
 # correlation between outcome variables is pretty high meaning if we predict for ex. infant mortality we know pretty well how to predict other outcome variables
 # this is true for most variables except for tuberculosis and malaria
 # for the sake of time we only predict classification of tuberculosis
 
+corr_outcome = cor(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na())
+corrplot::corrplot(corr_outcome, method = "color", type = "full")
+
+corr_explanatory = cor(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na())
+corrplot::corrplot(corr_explanatory, method = "color", type = "full")
+
 ```
 
 ```{r, fig.width=20, fig.height=10}
 
-summary_data <- cleaned_merged_data |>
-  group_by(Period) |>
-  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) |>
-  ungroup()
+summary_data <- cleaned_merged_data |> group_by(Period) |> summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) |> ungroup()
 
-summary_long <- summary_data |>
-  pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
+summary_long <- summary_data |> pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
 
-summary_long |> ggplot(aes(x = Period, y = mean_value, colour = feature)) + geom_point() + geom_line()
-
-summary_long
-
+summary_long |> ggplot(aes(x = Period, y = mean_value, color = feature)) + geom_point() + geom_line()
 
 ```
 ```{r, fig.width=10, fig.height10}
@@ -509,7 +508,12 @@ pred_tibble = all_preds %>%
 
 ```{r}
 
-pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
+pred_tibble |> filter(.metric != "rsq") |> ggplot() + geom_col(aes(x = reorder(model, .estimate), y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble |> filter(.metric == "rsq") |> ggplot() + geom_col(aes(x = reorder(model, .estimate), y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble
+
 
 ```
 ```{r, fig.width=10, fig.height=6}
@@ -572,7 +576,7 @@ basic_rec <-recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
 
 # models
 
-# nb_model <- naive_Bayes(smoothness = tune()) |> set_engine("KlaR") |> set_mode("classification")
+# nb_model <- naive_Bayes(smoothness = tune(), Laplace = 0.01) |> set_engine("KlaR") |> set_mode("classification")
 knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("classification")
 rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("classification")
 xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("classification")
@@ -714,6 +718,8 @@ pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosi
 
 pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
 
+pred_tibble
+
 ```
 ```{r}
 
@@ -726,11 +732,17 @@ for (m in unique(all_preds$model)) {
 
 ```{r}
 
+auc_scores = tibble()
+
 for (m in unique(all_preds$model)) {
   
   roc_curve = all_preds_prob |> filter(model == m) |> roc_curve(truth = binned_tuberculosis, .pred_0) |> autoplot() + ggtitle(paste("ROC Curve -", m))
+  auc_scores = bind_rows(auc_scores, tibble(m))
+  auc_scores = auc_scores |> mutate(roc_auc = (all_preds_prob |> filter(model == m) |> roc_auc(truth = binned_tuberculosis, .pred_0))$.estimate)
   print(roc_curve)
 }
+
+auc_scores
 
 ```
 
