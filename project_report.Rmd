@@ -4,6 +4,24 @@ output: html_document
 date: "2025-05-22"
 ---
 
+```{r}
+# Packages
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(glmnet)
+library(ranger)
+options(ranger.num.threads = 16)
+library(xgboost)
+library(kknn)
+library(performance)
+library(discrim)
+library(vip)
+```
+
+
 # Data Project & Hackathon 2 - Worldwide Well-being
 
 #### Authors: [William Ambrosetti](https://github.com/WiiLife), [Alexandra Biddiscombe](https://github.com/ambiddisco), [Youssef Sedra](https://github.com/ysedra)
@@ -82,6 +100,182 @@ All data is divided and stored by country and by year:
 -   **Location** : The country in which the value described was recorded;
 -   **Period** : The year in which the value described was recorded.
 
+
+```{r}
+
+# outcome features
+infant_mortality_rate_data = read_csv("data/infantMortalityRate.csv")
+maternal_mortality_ratio_data = read_csv("data/maternalMortalityRatio.csv")
+life_expectency_at_birth_data = read_csv("data/lifeExpectancyAtBirth.csv")
+incidence_of_malaria_data = read_csv("data/incedenceOfMalaria.csv")
+incidence_of_tuberculosis_data = read_csv("data/incedenceOfTuberculosis.csv")
+crude_sucide_rates = read_csv("data/crudeSuicideRates.csv")
+poison_mortality_rate = read_csv("data/mortalityRatePoisoning.csv")
+neo_natal_mortality_rate = read_csv("data/neonatalMortalityRate.csv")
+new_hiv_infections = read_csv("data/newHivInfections.csv")
+road_traffic_deaths = read_csv("data/roadTrafficDeaths.csv")
+under_5_mortality_rate = read_csv("data/under5MortalityRate.csv")
+# air_pollution_death_rate = read_csv("data/airPollutionDeathRate.csv")   has too many features and is only for 2016
+
+
+# decision features
+medical_doctors_data = read_csv("data/medicalDoctors.csv")
+pharmacists_data = read_csv("data/pharmacists.csv")
+birth_by_skilled_personel_data = read_csv("data/birthAttendedBySkilledPersonal.csv")
+number_of_dentists = read_csv("data/dentists.csv")
+drinking_water_services = read_csv("data/basicDrinkingWaterServices.csv")
+# least_basic_sanitation_services = read_csv("data/atLeastBasicSanitizationServices.csv")
+basic_hand_washing = read_csv("data/basicHandWashing.csv")
+clean_fuel_and_teck = read_csv("data/cleanFuelAndTech.csv")
+tabacco_age_15 = read_csv("data/tobaccoAge15.csv")
+nursing_services = read_csv("data/nursingAndMidwife.csv")
+sanitation_services = read_csv("data/safelySanitization.csv")
+
+
+head(medical_doctors_data, 5)
+```
+
+```{r}
+
+# function to remove indicator and rename `First Tooltip` to indicator feature name
+replace_inidcator_to_tooltip = function(tibble) {
+  df = tibble
+  feat_name = tibble$Indicator[1]
+  df = subset(df, select = - Indicator)
+  names(df)[names(df) == "First Tooltip"] <- feat_name
+  
+  return(df)
+}
+```
+
+```{r}
+
+# lowest 1962 year
+# highest 2019 year
+
+# creating an empty merged_data so we can add all the features from the datasets
+
+countries = c(
+    "Afghanistan", "Albania", "Algeria", "Angola", "Antigua and Barbuda",
+    "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+    "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus",
+    "Belgium", "Belize", "Benin", "Bhutan", "Bolivia (Plurinational State of)",
+    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei Darussalam",
+    "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia",
+    "Cameroon", "Canada", "Central African Republic", "Chad", "Chile",
+    "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia",
+    "Cuba", "Cyprus", "Czechia", "Côte d'Ivoire", "Democratic People's Republic of Korea",
+    "Democratic Republic of the Congo", "Denmark", "Djibouti",
+    "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea",
+    "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland",
+    "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana",
+    "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau",
+    "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India",
+    "Indonesia", "Iran (Islamic Republic of)", "Iraq", "Ireland",
+    "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
+    "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Lao People's Democratic Republic",
+    "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Lithuania",
+    "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives",
+    "Mali", "Malta", "Mauritania", "Mauritius", "Mexico", "Micronesia (Federated States of)",
+    "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+    "Namibia", "Nepal", "Netherlands", "New Zealand", "Nicaragua",
+    "Niger", "Nigeria", "Norway", "Oman", "Pakistan", "Panama",
+    "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland",
+    "Portugal", "Qatar", "Republic of Korea", "Republic of Moldova",
+    "Romania", "Russian Federation", "Rwanda", "Saint Lucia",
+    "Saint Vincent and the Grenadines", "Samoa", "Sao Tome and Principe",
+    "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone",
+    "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia",
+    "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan",
+    "Sudan (until 2011)", "Suriname", "Sweden", "Switzerland",
+    "Syrian Arab Republic", "Tajikistan", "Thailand", "The former Yugoslav Republic of Macedonia",
+    "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia",
+    "Turkey", "Turkmenistan", "Uganda", "Ukraine", "United Arab Emirates",
+    "United Kingdom of Great Britain and Northern Ireland", "United Republic of Tanzania",
+    "United States of America", "Uruguay", "Uzbekistan", "Vanuatu",
+    "Venezuela (Bolivarian Republic of)", "Viet Nam", "Yemen",
+    "Zambia", "Zimbabwe", "Andorra", "Cook Islands", "Dominica",
+    "Marshall Islands", "Nauru", "Niue", "Palau", "Saint Kitts and Nevis",
+    "State of Palestine", "Tuvalu", "Monaco", "San Marino", "Germany, Federal Republic (former)",
+    "India (until 1975)", "Kiribati (until 1984)", "South Viet Nam (former)")
+
+years <- 2019:1962
+
+merged_data = tibble(Location=countries) |> mutate(Period = list(years)) |> unnest(Period)
+
+merged_data
+
+```
+
+```{r}
+
+# pipelining each data set through data modifications it needs to become tidy
+medical_doctors_data = medical_doctors_data |> replace_inidcator_to_tooltip()
+birth_by_skilled_personel_data = birth_by_skilled_personel_data |> replace_inidcator_to_tooltip()
+life_expectency_at_birth_data = life_expectency_at_birth_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from=`Life expectancy at birth (years)`)
+pharmacists_data = pharmacists_data |> replace_inidcator_to_tooltip()
+infant_mortality_rate_data = infant_mortality_rate_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)`) |> mutate(across(c(`Both sexes`, Male, Female), ~ as.numeric(sub(" .*", "", .x))))
+maternal_mortality_ratio_data = maternal_mortality_ratio_data |> replace_inidcator_to_tooltip() |> mutate(across(`Maternal mortality ratio (per 100 000 live births)`, ~ as.numeric(sub(" .*", "", .x))))
+incidence_of_malaria_data = incidence_of_malaria_data |> replace_inidcator_to_tooltip()
+incidence_of_tuberculosis_data = incidence_of_tuberculosis_data |> replace_inidcator_to_tooltip() |> mutate(across(`Incidence of tuberculosis (per 100 000 population per year)`, ~ as.numeric(sub(" .*", "", .x))))
+
+# air_pollution_death_rate = air_pollution_death_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from = c(Dim1, Dim2), values_from = `First Tooltip`) |> replace_inidcator_to_tooltip()
+
+crude_sucide_rates = crude_sucide_rates |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+poison_mortality_rate = poison_mortality_rate |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+neo_natal_mortality_rate = neo_natal_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> replace_inidcator_to_tooltip() |> select(-c(Dim1))
+new_hiv_infections = new_hiv_infections |> drop_na() |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+road_traffic_deaths = road_traffic_deaths |> replace_inidcator_to_tooltip()
+under_5_mortality_rate = under_5_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+number_of_dentists = number_of_dentists |> replace_inidcator_to_tooltip()
+drinking_water_services = drinking_water_services |> replace_inidcator_to_tooltip()
+# least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+basic_hand_washing = basic_hand_washing |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+clean_fuel_and_teck = clean_fuel_and_teck |> replace_inidcator_to_tooltip()
+tabacco_age_15 = tabacco_age_15  |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+nursing_services = nursing_services |> replace_inidcator_to_tooltip()
+sanitation_services = sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+
+```
+
+```{r}
+
+merged_data = full_join(merged_data, drinking_water_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, number_of_dentists, by=c("Location", "Period"))
+# merged_data = full_join(merged_data, least_basic_sanitation_services |> rename(sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, basic_hand_washing |> rename(basic_hand_washing_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, tabacco_age_15 |> rename(tabacco_age_15=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, nursing_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, sanitation_services |> rename(total_sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, under_5_mortality_rate |> rename(under_5_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, road_traffic_deaths |> mutate(`Estimated road traffic death rate (per 10 000 population)`=`Estimated road traffic death rate (per 100 000 population)`/10) |> select(-c(`Estimated road traffic death rate (per 100 000 population)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, new_hiv_infections |> rename(hiv_infections=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, neo_natal_mortality_rate |> mutate(`Neonatal mortality rate (per 10 000 live births)`=`Neonatal mortality rate (per 1000 live births)`*10) |> select(-c(`Neonatal mortality rate (per 1000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, poison_mortality_rate |> rename(poison_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, crude_sucide_rates |> rename(sucide_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, life_expectency_at_birth_data |> rename(life_expectency_at_birth=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, birth_by_skilled_personel_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, medical_doctors_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, pharmacists_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, infant_mortality_rate_data |> rename(infant_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, maternal_mortality_ratio_data |> mutate(`Maternal mortality ratio (per 10 000 live births)`=`Maternal mortality ratio (per 100 000 live births)`*10) |> select(-c(`Maternal mortality ratio (per 100 000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_malaria_data |> mutate(`Malaria incidence (per 10 000 population at risk)`=`Malaria incidence (per 1 000 population at risk)`*10) |> select(-c(`Malaria incidence (per 1 000 population at risk)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`Incidence of tuberculosis (per 10 000 population per year)`=`Incidence of tuberculosis (per 100 000 population per year)`*10) |> select(-c(`Incidence of tuberculosis (per 100 000 population per year)`)), by=c("Location", "Period"))
+
+merged_data
+
+```
+
+```{r}
+
+outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria incidence (per 10 000 population at risk)", "Incidence of tuberculosis (per 10 000 population per year)", "under_5_mortality_rate", "Estimated road traffic death rate (per 10 000 population)", "hiv_infections", "Neonatal mortality rate (per 10 000 live births)", "poison_mortality_rate", "sucide_rate", "life_expectency_at_birth", "infant_mortality_rate")
+
+explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
+explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
+
+```
+
+
 The size of the data table is determined by the number of countries (200) and the timespan (1962 - 2019) for a total of 11'600 rows and 22 columns. Of these, 200'000 are missing values. The missing data needs to be dealt with before any real answers can be properly explored. To minimise this issue, we looked at missing data by year and removed the worst period, keeping data only after the year 2'000, then looking at the missing values per feature and choosing to reject any features with more than a limit of 3'000 missing points, set at that number to not remove too many features and still keep the data usable. This means removing 6 features, of which 5 outcomes, so to verify that we are not losing too much information we visualised some initial correlation plots between all outcome features, verifying high values of correlation between the columns to be removed and those kept, thus ensuring not too much information is lost.
 
 We are left with the following 16 features, divided into 6 outcome, 8 explanatory and 2 that represent the country and year of the data's recording.
@@ -109,8 +303,174 @@ All data is still divided and stored by country and by year:
 -   **Location** : The country in which the value described was recorded;
 -   **Period** : The year in which the value described was recorded.
 
-We proceeded to perform some ulterior cleaning, by normalising all the data and plotting the outliers. After noticing a strange phenomenon in number of nurses, where the number of recorded nurses in Belize approached 3'000 per 10'000 people, we decided to remove it before continuing to the rest of the exploration, because it had a negative effect on the model performances.
+
+```{r}
+
+non_na_per_period <- merged_data %>% select(-c(Location)) %>%
+  rowwise() %>%
+  mutate(non_na_count = sum(!is.na(c_across(where(~ !is.list(.x)))))) %>%
+  ungroup() %>%
+  group_by(Period) %>%
+  summarise(total_non_na = sum(non_na_count))
+
+ggplot(non_na_per_period, aes(x = Period, y = total_non_na)) +
+  geom_col(fill = "seagreen") +
+  labs(title = "Total Non-NA Values per Period",
+       x = "Year",
+       y = "Non-NA Value Count") +
+  theme_minimal()
+
+# lets keep the data only from 2000 on wards
+
+merged_data = merged_data |> filter(Period >= 2000)
+
+na_counts <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count")
+
+ggplot(na_counts, aes(x = reorder(feature, na_count), y = na_count)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(title = "NA Values per Feature",
+       x = "Feature",
+       y = "NA Count") +
+  theme_minimal()
+
+valid_features <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count") %>%
+  filter(na_count < 3000) %>%
+  pull(feature)
+
+cleaned_merged_data <- merged_data %>%
+  select(all_of(valid_features))
+
+```
+
+We proceeded to perform some ulterior cleaning, by normalising all the data and plotting the outliers. 
+
+After noticing a strange phenomenon in number of nurses, where the number of recorded nurses in Belize approached 3'000 per 10'000 people, we decided to remove it before continuing to the rest of the exploration, because it had a negative effect on the model performances.
+
+
+```{r, fig.width=10, fig.height10}
+
+feat_data = cleaned_merged_data |> select(-c(Location, Period))
+
+rec <- recipe(~ ., data = feat_data) |>
+  step_normalize(all_numeric_predictors()) |> 
+  prep()
+
+feat_data = bake(rec, new_data = NULL) |> pivot_longer(cols = everything(), names_to = "features", values_to = "values")
+
+feat_data |> ggplot(aes(x = features, y = values)) + geom_boxplot() + coord_flip()
+
+
+```
+
+```{r}
+
+cleaned_merged_data |> select(`Nursing and midwifery personnel (per 10,000)`) |> drop_na() |> ggplot(aes(x = "Nursing and midwifery personnel (per 10,000)", y = `Nursing and midwifery personnel (per 10,000)`)) + geom_boxplot()
+
+cleaned_merged_data |> select(Location, Period, `Nursing and midwifery personnel (per 10,000)`) |> filter(`Nursing and midwifery personnel (per 10,000)` >= 1000)
+
+# outliers
+
+outliers = cleaned_merged_data |> filter(`Nursing and midwifery personnel (per 10,000)` > 1500)
+
+cleaned_merged_data = cleaned_merged_data |> anti_join(outliers, by = "Location")
+
+```
+
 
 ### 2.4 Data exploration
 
-To inform ourselves about the general data distribution, we started by plotting the the average of each feature by year, hoping to see a linear progression towards better quality of life. This showed us that mortality rates have been steadily decreasing, access to sanitation has not had the greatest change over time, and rates of disease have slowly but surely lessened over time. From this graph we determined it was important to select some features as the most important with which to judge a country. How can we select which is the best country to live in if we cannot determine what features make up the best country? For this purpose we
+To inform ourselves about the general data distribution, we started by plotting the the average of each feature by year (over all countries), hoping to see a linear progression towards better quality of life. 
+
+
+```{r, fig.width=20, fig.height=10}
+
+summary_data <- cleaned_merged_data |> group_by(Period) |> summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) |> ungroup()
+summary_long <- summary_data |> pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
+
+below_500 = summary_long |> filter(mean_value < 500)
+above_500 = summary_long |> filter(mean_value >= 500)
+
+below_500 |> ggplot(aes(x = Period, y = mean_value, color = feature)) + geom_point() + geom_line()
+above_500 |> ggplot(aes(x = Period, y = mean_value, colour = feature)) + geom_point() + geom_line()
+
+```
+
+The plot in divided into two sections as the values are very different, so the first plot (data with values under 500) would be completely invisible with the elements of the second plot also in the same file.
+
+Thanks to these graphs we can see that the highest rate of occurrence of our features are the incidents of tuberculosis and those of malaria, and that as we expected, all features related to deaths have been steadily decreasing over time. Features relating to infrastructure (basic services like drinking and sanitation) have seen a gradual increase, with the exception of nursing and midwife personnel.
+
+Next we plotted a series of correlation matrices to see if any features are strongly correlated with others, and to find the most important features to create a model with, to simply determine the quality of life in a country.
+
+First of all, we want to compare the prevalence of different jobs in the the health sector: doctors, dentists and pharmacists.
+
+```{r}
+
+ggpairs(cleaned_merged_data |> select(`Dentists (per 10,000)`, `Pharmacists  (per 10,000)`, `Medical doctors (per 10,000)`) |> drop_na(), progress = F)
+
+```
+
+Next, we view the correlations between all outcome features and between all decision features. 
+
+```{r}
+
+explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
+outcome_feat = intersect(outcome_feat, names(cleaned_merged_data))
+
+```
+
+```{r, fig.width=12, fig.height=10}
+
+# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na(), progress = F)
+
+# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na(), progress = F)
+
+# correlation between outcome variables is pretty high meaning if we predict for ex. infant mortality we know pretty well how to predict other outcome variables
+# this is true for most variables except for tuberculosis and malaria
+# for the sake of time we only predict classification of tuberculosis
+
+corr_outcome = cor(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na())
+corrplot::corrplot(corr_outcome, method = "color", type = "full")
+
+corr_explanatory = cor(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na())
+corrplot::corrplot(corr_explanatory, method = "color", type = "full")
+
+```
+
+In the correlation plot of outcome variables, we immediately noticed that the mortality rates surrounding childbirth (maternal mortality rate, neonatal mortality rate, infant mortality rate, under 5 mortality rate) are highly correlated with each other and even with the malaria incidents, whereas incidents of tuberculosis seems to be very uncorrelated to all outcome features.
+
+We also plotted the decision feature correlations, which we do not intend to change because all will be used in the models for our questions, but it's interesting to note that the highest correlation occurs between "Population using at least basic drinking-water services" and "Births attended by skilled health personnel", whereas the highest negative correlation is between "Nursing and midwifery personnel" and "tobacco age 15".
+
+After this exploration, we came to the conclusion that we can use two features to determine the quality of life of a country: Incidents of tuberculosis, and infant mortality rate. This means we are including two features that act completely differently from each other, and so we are gaining new information with both features. By including a feature highly correlated to infant mortality, we would not be adding new information, as we can already obtain it by looking at the infant mortality rate.
+
+
+
+
+
+
+
+
+
+
+
+
+From now on, we will evaluate countries using those 
+
+
+This showed us that mortality rates have been steadily decreasing, access to sanitation has not had the greatest change over time, and rates of disease have slowly but surely lessened over time. From this graph we determined it was important to select some features as the most important with which to judge a country. How can we select which is the best country to live in if we cannot determine what features make up the best country? 
+
+
+```{r, fig.width=10, fig.height10}
+
+top_country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(desc(mean_infant_mortalilty)) |> head(10)
+least_country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(mean_infant_mortalilty) |> head(10)
+
+top_least_country_infant_mortality = bind_rows(top_country_infant_mortality, least_country_infant_mortality)
+
+top_least_country_infant_mortality |> ggplot(aes(x = reorder(Location, mean_infant_mortalilty), y = mean_infant_mortalilty)) + geom_col() + coord_flip() + labs(title = "top 10 and least 10 countries with mean infant mortality rate")
+
+```
