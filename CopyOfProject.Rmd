@@ -1,0 +1,809 @@
+---
+title: "Project"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+Packages
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(glmnet)
+library(ranger)
+options(ranger.num.threads = 16)
+library(xgboost)
+library(kknn)
+library(performance)
+library(discrim)
+library(vip)
+```
+
+PROJECT
+
+– clean and explore the data; – study the feasibility of the questions;
+– propose different methods to answer the questions and study their
+advantages and limitations; – develop visualizations to explain both the
+data and the methods’ advantages and limitations; – present the results
+in a concise way through a presentation; – present the work in a more
+extensive way with a report.
+
+Question setup: We are aliens who are looking at Earth. We have a vague
+understanding that the territory is separated by geographical regions,
+countries and continents, and each has a choice on how to run its own
+territory. We land in a determined region and want to see how to improve
+it.
+
+First of all: determine how to evaluate a country: (outcome variables) -
+infant mortality rate - maternal mortality rate - life expectancy at
+birth - air pollution death rate - crude suicide rates (??) - incidents
+of malaria - incidents of tuberculosis - poisoning mortality rate (??) -
+neonatal mortality rate - new HIV infections (??) - road traffic
+deaths - under 5 mortality rate
+
+determine what a country can change to influence the above outcomes:
+(decision variables) - number of doctors - number of dentists - number
+of pharmacists - basic drinking water services - least basic sanitation
+services - births attended by skilled personnel - basic hand washing -
+clean fuel and tech - tobacco at age 15 (advertisement) (maybe not
+this) - nursing and midwife numbers - usage of sanitation services
+
+POTENTAIL QUESTIONS TO BE ANSWERED
+
+Q1. Which are the most impactful features (decision variables) when
+predicting outcome variables (lin reg) Q2. predict classification
+outcome variables based in decision variables Q3. do this for a specific
+country/continent (looking at the historic data and all different
+features) Q4. (maybe) clustering by Continent based on important outcome
+features
+
+Hypothesis: Higher literacy/education levels are associated with better
+health outcomes (e.g., lower infant mortality). Hypothesis: Female have
+the same life expectancy at birth to males Hypothesis: Female infant
+mortality is the same to male infant mortality.
+
+correlations Hypothesis: incidence of diseases (Tuberculosis, Malaria)
+correlate with infant mortality rate Hypothesis: medical doctors
+correlate with life expectancy at birth ...
+
+classification classify continent based on features (?specific year)
+
+Loading data which might seem useful to answer statistical questions
+
+```{r}
+
+# outcome features
+infant_mortality_rate_data = read_csv("data/infantMortalityRate.csv")
+maternal_mortality_ratio_data = read_csv("data/maternalMortalityRatio.csv")
+life_expectency_at_birth_data = read_csv("data/lifeExpectancyAtBirth.csv")
+incidence_of_malaria_data = read_csv("data/incedenceOfMalaria.csv")
+incidence_of_tuberculosis_data = read_csv("data/incedenceOfTuberculosis.csv")
+crude_sucide_rates = read_csv("data/crudeSuicideRates.csv")
+poison_mortality_rate = read_csv("data/mortalityRatePoisoning.csv")
+neo_natal_mortality_rate = read_csv("data/neonatalMortalityRate.csv")
+new_hiv_infections = read_csv("data/newHivInfections.csv")
+road_traffic_deaths = read_csv("data/roadTrafficDeaths.csv")
+under_5_mortality_rate = read_csv("data/under5MortalityRate.csv")
+# air_pollution_death_rate = read_csv("data/airPollutionDeathRate.csv")   has too many features and is only for 2016
+
+
+# decision features
+medical_doctors_data = read_csv("data/medicalDoctors.csv")
+pharmacists_data = read_csv("data/pharmacists.csv")
+birth_by_skilled_personel_data = read_csv("data/birthAttendedBySkilledPersonal.csv")
+number_of_dentists = read_csv("data/dentists.csv")
+drinking_water_services = read_csv("data/basicDrinkingWaterServices.csv")
+# least_basic_sanitation_services = read_csv("data/atLeastBasicSanitizationServices.csv")
+basic_hand_washing = read_csv("data/basicHandWashing.csv")
+clean_fuel_and_teck = read_csv("data/cleanFuelAndTech.csv")
+tabacco_age_15 = read_csv("data/tobaccoAge15.csv")
+nursing_services = read_csv("data/nursingAndMidwife.csv")
+sanitation_services = read_csv("data/safelySanitization.csv")
+
+
+head(medical_doctors_data, 5)
+```
+
+```{r}
+
+# function to remove indicator and rename `First Tooltip` to indicator feature name
+replace_inidcator_to_tooltip = function(tibble) {
+  df = tibble
+  feat_name = tibble$Indicator[1]
+  df = subset(df, select = - Indicator)
+  names(df)[names(df) == "First Tooltip"] <- feat_name
+  
+  return(df)
+}
+
+```
+
+```{r}
+
+# lowest 1962 year
+# highest 2019 year
+
+# creating an empty merged_data so we can add all the features from the datasets
+
+countries = c(
+    "Afghanistan", "Albania", "Algeria", "Angola", "Antigua and Barbuda",
+    "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+    "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus",
+    "Belgium", "Belize", "Benin", "Bhutan", "Bolivia (Plurinational State of)",
+    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei Darussalam",
+    "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia",
+    "Cameroon", "Canada", "Central African Republic", "Chad", "Chile",
+    "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia",
+    "Cuba", "Cyprus", "Czechia", "Côte d'Ivoire", "Democratic People's Republic of Korea",
+    "Democratic Republic of the Congo", "Denmark", "Djibouti",
+    "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea",
+    "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland",
+    "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana",
+    "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau",
+    "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India",
+    "Indonesia", "Iran (Islamic Republic of)", "Iraq", "Ireland",
+    "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
+    "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Lao People's Democratic Republic",
+    "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Lithuania",
+    "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives",
+    "Mali", "Malta", "Mauritania", "Mauritius", "Mexico", "Micronesia (Federated States of)",
+    "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+    "Namibia", "Nepal", "Netherlands", "New Zealand", "Nicaragua",
+    "Niger", "Nigeria", "Norway", "Oman", "Pakistan", "Panama",
+    "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland",
+    "Portugal", "Qatar", "Republic of Korea", "Republic of Moldova",
+    "Romania", "Russian Federation", "Rwanda", "Saint Lucia",
+    "Saint Vincent and the Grenadines", "Samoa", "Sao Tome and Principe",
+    "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone",
+    "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia",
+    "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan",
+    "Sudan (until 2011)", "Suriname", "Sweden", "Switzerland",
+    "Syrian Arab Republic", "Tajikistan", "Thailand", "The former Yugoslav Republic of Macedonia",
+    "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia",
+    "Turkey", "Turkmenistan", "Uganda", "Ukraine", "United Arab Emirates",
+    "United Kingdom of Great Britain and Northern Ireland", "United Republic of Tanzania",
+    "United States of America", "Uruguay", "Uzbekistan", "Vanuatu",
+    "Venezuela (Bolivarian Republic of)", "Viet Nam", "Yemen",
+    "Zambia", "Zimbabwe", "Andorra", "Cook Islands", "Dominica",
+    "Marshall Islands", "Nauru", "Niue", "Palau", "Saint Kitts and Nevis",
+    "State of Palestine", "Tuvalu", "Monaco", "San Marino", "Germany, Federal Republic (former)",
+    "India (until 1975)", "Kiribati (until 1984)", "South Viet Nam (former)")
+
+years <- 2019:1962
+
+merged_data = tibble(Location=countries) |> mutate(Period = list(years)) |> unnest(Period)
+
+merged_data
+
+```
+
+```{r}
+
+# pipelining each data set through data modifications it needs to become tidy
+medical_doctors_data = medical_doctors_data |> replace_inidcator_to_tooltip()
+birth_by_skilled_personel_data = birth_by_skilled_personel_data |> replace_inidcator_to_tooltip()
+life_expectency_at_birth_data = life_expectency_at_birth_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from=`Life expectancy at birth (years)`)
+pharmacists_data = pharmacists_data |> replace_inidcator_to_tooltip()
+infant_mortality_rate_data = infant_mortality_rate_data |> replace_inidcator_to_tooltip() |> pivot_wider(names_from = Dim1, values_from = `Infant mortality rate (probability of dying between birth and age 1 per 1000 live births)`) |> mutate(across(c(`Both sexes`, Male, Female), ~ as.numeric(sub(" .*", "", .x))))
+maternal_mortality_ratio_data = maternal_mortality_ratio_data |> replace_inidcator_to_tooltip() |> mutate(across(`Maternal mortality ratio (per 100 000 live births)`, ~ as.numeric(sub(" .*", "", .x))))
+incidence_of_malaria_data = incidence_of_malaria_data |> replace_inidcator_to_tooltip()
+incidence_of_tuberculosis_data = incidence_of_tuberculosis_data |> replace_inidcator_to_tooltip() |> mutate(across(`Incidence of tuberculosis (per 100 000 population per year)`, ~ as.numeric(sub(" .*", "", .x))))
+
+# air_pollution_death_rate = air_pollution_death_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from = c(Dim1, Dim2), values_from = `First Tooltip`) |> replace_inidcator_to_tooltip()
+
+crude_sucide_rates = crude_sucide_rates |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+poison_mortality_rate = poison_mortality_rate |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+neo_natal_mortality_rate = neo_natal_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> replace_inidcator_to_tooltip() |> select(-c(Dim1))
+new_hiv_infections = new_hiv_infections |> drop_na() |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+road_traffic_deaths = road_traffic_deaths |> replace_inidcator_to_tooltip()
+under_5_mortality_rate = under_5_mortality_rate |> mutate(across(`First Tooltip`, ~ as.numeric(sub(" .*", "", .x)))) |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+number_of_dentists = number_of_dentists |> replace_inidcator_to_tooltip()
+drinking_water_services = drinking_water_services |> replace_inidcator_to_tooltip()
+# least_basic_sanitation_services = least_basic_sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+basic_hand_washing = basic_hand_washing |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+clean_fuel_and_teck = clean_fuel_and_teck |> replace_inidcator_to_tooltip()
+tabacco_age_15 = tabacco_age_15  |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+nursing_services = nursing_services |> replace_inidcator_to_tooltip()
+sanitation_services = sanitation_services |> pivot_wider(names_from=Dim1, values_from=`First Tooltip`) |> replace_inidcator_to_tooltip()
+
+```
+
+```{r}
+
+merged_data = full_join(merged_data, drinking_water_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, number_of_dentists, by=c("Location", "Period"))
+# merged_data = full_join(merged_data, least_basic_sanitation_services |> rename(sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, basic_hand_washing |> rename(basic_hand_washing_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, tabacco_age_15 |> rename(tabacco_age_15=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, nursing_services, by=c("Location", "Period"))
+merged_data = full_join(merged_data, sanitation_services |> rename(total_sanitation_services=Total) |> select(-c(Urban, Rural)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, under_5_mortality_rate |> rename(under_5_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, road_traffic_deaths |> mutate(`Estimated road traffic death rate (per 10 000 population)`=`Estimated road traffic death rate (per 100 000 population)`/10) |> select(-c(`Estimated road traffic death rate (per 100 000 population)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, new_hiv_infections |> rename(hiv_infections=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, neo_natal_mortality_rate |> mutate(`Neonatal mortality rate (per 10 000 live births)`=`Neonatal mortality rate (per 1000 live births)`*10) |> select(-c(`Neonatal mortality rate (per 1000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, poison_mortality_rate |> rename(poison_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, crude_sucide_rates |> rename(sucide_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, life_expectency_at_birth_data |> rename(life_expectency_at_birth=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, birth_by_skilled_personel_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, medical_doctors_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, pharmacists_data, by=c("Location", "Period"))
+merged_data = full_join(merged_data, infant_mortality_rate_data |> rename(infant_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, maternal_mortality_ratio_data |> mutate(`Maternal mortality ratio (per 10 000 live births)`=`Maternal mortality ratio (per 100 000 live births)`*10) |> select(-c(`Maternal mortality ratio (per 100 000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_malaria_data |> mutate(`Malaria incidence (per 10 000 population at risk)`=`Malaria incidence (per 1 000 population at risk)`*10) |> select(-c(`Malaria incidence (per 1 000 population at risk)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`Incidence of tuberculosis (per 10 000 population per year)`=`Incidence of tuberculosis (per 100 000 population per year)`*10) |> select(-c(`Incidence of tuberculosis (per 100 000 population per year)`)), by=c("Location", "Period"))
+
+merged_data
+
+```
+
+```{r}
+
+outcome_feat = c("Maternal mortality ratio (per 10 000 live births)", "Malaria incidence (per 10 000 population at risk)", "Incidence of tuberculosis (per 10 000 population per year)", "under_5_mortality_rate", "Estimated road traffic death rate (per 10 000 population)", "hiv_infections", "Neonatal mortality rate (per 10 000 live births)", "poison_mortality_rate", "sucide_rate", "life_expectency_at_birth", "infant_mortality_rate")
+
+explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
+explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
+
+```
+
+```{r}
+
+non_na_per_period <- merged_data %>% select(-c(Location)) %>%
+  rowwise() %>%
+  mutate(non_na_count = sum(!is.na(c_across(where(~ !is.list(.x)))))) %>%
+  ungroup() %>%
+  group_by(Period) %>%
+  summarise(total_non_na = sum(non_na_count))
+
+ggplot(non_na_per_period, aes(x = Period, y = total_non_na)) +
+  geom_col(fill = "seagreen") +
+  labs(title = "Total Non-NA Values per Period",
+       x = "Year",
+       y = "Non-NA Value Count") +
+  theme_minimal()
+
+# lets keep the data only from 2000 on wards
+
+merged_data = merged_data |> filter(Period >= 2000)
+
+na_counts <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count")
+
+ggplot(na_counts, aes(x = reorder(feature, na_count), y = na_count)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(title = "NA Values per Feature",
+       x = "Feature",
+       y = "NA Count") +
+  theme_minimal()
+
+valid_features <- merged_data %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "feature", values_to = "na_count") %>%
+  filter(na_count < 3000) %>%
+  pull(feature)
+
+cleaned_merged_data <- merged_data %>%
+  select(all_of(valid_features))
+
+```
+```{r, fig.width=10, fig.height10}
+
+feat_data = cleaned_merged_data |> select(-c(Location, Period))
+
+rec <- recipe(~ ., data = feat_data) |>
+  step_normalize(all_numeric_predictors()) |> 
+  prep()
+
+feat_data = bake(rec, new_data = NULL) |> pivot_longer(cols = everything(), names_to = "features", values_to = "values")
+
+feat_data |> ggplot(aes(x = features, y = values)) + geom_boxplot() + coord_flip()
+
+
+```
+```{r}
+
+cleaned_merged_data |> select(`Nursing and midwifery personnel (per 10,000)`) |> drop_na() |> ggplot(aes(x = "Nursing and midwifery personnel (per 10,000)", y = `Nursing and midwifery personnel (per 10,000)`)) + geom_boxplot()
+
+cleaned_merged_data |> select(Location, Period, `Nursing and midwifery personnel (per 10,000)`) |> filter(`Nursing and midwifery personnel (per 10,000)` >= 1000)
+
+# outliers
+
+outliers = cleaned_merged_data |> filter(`Nursing and midwifery personnel (per 10,000)` > 1500)
+
+cleaned_merged_data = cleaned_merged_data |> anti_join(outliers, by = "Location")
+
+```
+
+
+```{r}
+
+ggpairs(cleaned_merged_data |> select(`Dentists (per 10,000)`, `Pharmacists  (per 10,000)`, `Medical doctors (per 10,000)`) |> drop_na(), progress = F)
+
+```
+
+```{r}
+
+explanatory_feat = intersect(explanatory_feat, names(cleaned_merged_data))
+outcome_feat = intersect(outcome_feat, names(cleaned_merged_data))
+
+```
+
+```{r, fig.width=12, fig.height=10}
+
+# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na(), progress = F)
+
+# ggpairs(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na(), progress = F)
+
+# correlation between outcome variables is pretty high meaning if we predict for ex. infant mortality we know pretty well how to predict other outcome variables
+# this is true for most variables except for tuberculosis and malaria
+# for the sake of time we only predict classification of tuberculosis
+
+corr_outcome = cor(cleaned_merged_data |> select(-c(Location, Period)) |> select(outcome_feat) |> drop_na())
+corrplot::corrplot(corr_outcome, method = "color", type = "full")
+
+corr_explanatory = cor(cleaned_merged_data |> select(-c(Location, Period)) |> select(explanatory_feat) |> drop_na())
+corrplot::corrplot(corr_explanatory, method = "color", type = "full")
+
+```
+
+```{r, fig.width=20, fig.height=10}
+
+summary_data <- cleaned_merged_data |> group_by(Period) |> summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) |> ungroup()
+
+summary_long <- summary_data |> pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
+
+summary_long |> ggplot(aes(x = Period, y = mean_value, color = feature)) + geom_point() + geom_line()
+
+```
+```{r, fig.width=10, fig.height10}
+
+top_country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(desc(mean_infant_mortalilty)) |> head(10)
+least_country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(mean_infant_mortalilty) |> head(10)
+
+top_least_country_infant_mortality = bind_rows(top_country_infant_mortality, least_country_infant_mortality)
+
+top_least_country_infant_mortality |> ggplot(aes(x = reorder(Location, mean_infant_mortalilty), y = mean_infant_mortalilty)) + geom_col() + coord_flip() + labs(title = "top 10 and least 10 countries with mean infant mortality rate")
+
+```
+
+
+```{r}
+
+explanatory_feat_infant_mortality = c(explanatory_feat, "infant_mortality_rate")
+
+merged_train_test_split = cleaned_merged_data |> select(all_of(explanatory_feat_infant_mortality)) |> filter(!is.na(infant_mortality_rate)) |> initial_split(prop=0.8)
+
+merged_data_train = training(merged_train_test_split)
+merged_data_test = testing(merged_train_test_split)
+
+
+```
+
+```{r}
+
+# recipes
+
+base_recipe = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_normalize(all_numeric_predictors())
+
+recipe_imputed = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_impute_mean(all_numeric_predictors()) |> step_normalize(all_numeric_predictors())
+
+```
+
+```{r}
+
+# models
+
+lin_reg <- linear_reg() |> set_engine("lm")
+rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("regression")
+xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("regression")
+lasso_model <- linear_reg(penalty = tune(), mixture = 1) |> set_engine("glmnet") |> set_mode("regression")
+knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("regression")
+
+```
+
+```{r}
+
+# workflows
+
+lr_workflow = workflow() |> add_model(lin_reg) |> add_recipe(recipe_imputed)
+rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(recipe_imputed)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(base_recipe)
+knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(recipe_imputed)
+lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(recipe_imputed)
+
+```
+
+```{r}
+metrics <- metric_set(yardstick::rmse, yardstick::mae, yardstick::rsq)
+```
+
+```{r}
+# cross validation for k
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+knn_grid <- tibble(neighbors = seq(1, 10, by = 1))
+
+knn_tune_results <- tune_grid(
+  knn_workflow,
+  resamples = cv_folds,
+  grid = knn_grid,
+  metrics = metrics
+)
+
+autoplot(knn_tune_results)
+
+best_k <- select_best(knn_tune_results, metric = "rmse")
+
+final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
+
+```
+
+```{r}
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+lasso_grid <- tibble(penalty = seq(0.01, 1, by=0.01))
+
+lasso_tune_results <- tune_grid(
+  lasso_workflow,
+  resamples = cv_folds,
+  grid = lasso_grid,
+  metrics = metrics
+)
+
+autoplot(lasso_tune_results)
+
+best_reg <- select_best(lasso_tune_results, metric = "rmse")
+
+final_lasso_workflow <- finalize_workflow(lasso_workflow, best_reg)
+
+```
+
+```{r}
+
+lr_fit  <- fit(lr_workflow, data = merged_data_train)
+rf_fit  <- fit(rf_workflow, data = merged_data_train)
+xgb_fit <- fit(xgb_workflow, data = merged_data_train)
+knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
+
+
+lr_preds <- predict(lr_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Linear")
+
+rf_preds <- predict(rf_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Random Forest")
+
+xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "XGBoost")
+
+knn_preds <- predict(knn_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Knn")
+
+lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Lasso")
+
+all_preds <- bind_rows(lr_preds, rf_preds, xgb_preds, knn_preds, lasso_preds)
+
+pred_tibble = all_preds %>%
+  group_by(model) %>%
+  metrics(truth = infant_mortality_rate, estimate = .pred)
+
+# rmse: root mean square error
+# rsq: R^2
+# mae: mean absolute error
+```
+
+```{r}
+
+pred_tibble |> filter(.metric != "rsq") |> ggplot() + geom_col(aes(x = reorder(model, .estimate), y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble |> filter(.metric == "rsq") |> ggplot() + geom_col(aes(x = reorder(model, .estimate), y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble
+
+
+```
+```{r, fig.width=10, fig.height=6}
+
+lr_fit |> extract_fit_engine() |> check_model()
+
+```
+
+
+```{r}
+
+# got explanation for linear regression 
+
+lr_fit |> extract_fit_engine() |> vip()
+
+```
+
+```{r}
+
+rf_fit |> extract_fit_engine() |> vip()
+
+```
+```{r}
+
+importance_df1 <- rf_fit |> extract_fit_engine() |> vip::vi()
+
+```
+
+
+```{r}
+
+mean_tub <- mean(cleaned_merged_data$`Incidence of tuberculosis (per 10 000 population per year)`, na.rm = TRUE)
+
+# get binned tuberculosis based on mean
+cleaned_merged_data <- cleaned_merged_data |> mutate(binned_tuberculosis = if_else(`Incidence of tuberculosis (per 10 000 population per year)` > mean_tub, 1, 0)) |> filter(!is.na(binned_tuberculosis)) |> mutate(binned_tuberculosis = as.factor(binned_tuberculosis))
+
+data_for_model = cleaned_merged_data |> select(all_of(explanatory_feat), binned_tuberculosis)
+
+data_split <- initial_split(data_for_model, prop = 0.8, strata = binned_tuberculosis) # strata maintains proportion of binned tuberculosis in training and testing
+merged_data_train <- training(data_split)
+merged_data_test <- testing(data_split)
+
+```
+
+```{r}
+
+# recipe for classification
+
+imputed_rec <- recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_impute_mean(all_numeric_predictors()) |>
+  # step_impute_mode(all_nominal_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+basic_rec <-recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_normalize(all_numeric_predictors())
+
+```
+
+```{r}
+
+# models
+
+# nb_model <- naive_Bayes(smoothness = tune(), Laplace = 0.01) |> set_engine("KlaR") |> set_mode("classification")
+knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("classification")
+rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("classification")
+xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("classification")
+lasso_model <- logistic_reg(penalty = tune(), mixture = 1) |> set_engine("glmnet") |> set_mode("classification")
+
+```
+
+```{r}
+
+# workflows
+
+# nb_workflow = workflow() |> add_model(nb_model) |> add_recipe(imputed_rec)
+rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(imputed_rec)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(basic_rec) # no need to impute
+knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(imputed_rec)
+lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(imputed_rec)
+
+```
+
+```{r}
+metrics <- metric_set(yardstick::accuracy, yardstick::precision, yardstick::recall, yardstick::f_meas) 
+```
+
+```{r}
+# cross validation for smoothness
+
+# cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+# smooth_grid <- tibble(smoothness = seq(1, 10, by = 1))
+
+# smooth_tune_results <- tune_grid(nb_workflow, resamples = cv_folds, grid = smooth_grid, metrics = metrics)
+
+# autoplot(smooth_tune_results)
+
+# best_smooth <- select_best(smooth_tune_results, metric = "accuracy")
+
+# final_knn_workflow <- finalize_workflow(nb_workflow, best_smooth)
+
+```
+
+```{r}
+# cross validation for k
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+knn_grid <- tibble(neighbors = seq(1, 30, by = 1))
+
+knn_tune_results <- tune_grid(
+  knn_workflow,
+  resamples = cv_folds,
+  grid = knn_grid,
+  metrics = metrics
+)
+
+autoplot(knn_tune_results)
+
+best_k <- select_best(knn_tune_results, metric = "accuracy")
+
+final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
+
+```
+```{r}
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+lasso_grid <- tibble(penalty = seq(0.0001, 1, by=0.01))
+
+lasso_grid <- grid_regular(penalty(), levels = 10)
+
+lasso_tune_results <- tune_grid(
+  lasso_workflow,
+  resamples = cv_folds,
+  grid = lasso_grid,
+  metrics = metrics
+)
+
+autoplot(lasso_tune_results)
+
+best_reg <- select_best(lasso_tune_results, metric = "accuracy")
+
+final_lasso_workflow <- finalize_workflow(lasso_workflow, best_reg)
+
+show_notes(lasso_tune_results)
+
+```
+
+```{r}
+
+# nb_fit  <- fit(nb_workflow, data = merged_data_train)
+rf_fit  <- fit(rf_workflow, data = merged_data_train)
+xgb_fit <- fit(xgb_workflow, data = merged_data_train)
+knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
+
+# nb_preds <- predict(nb_fit, merged_data_test) %>%
+  # bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  # mutate(model = "Linear")
+
+rf_preds <- predict(rf_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
+rf_preds_prob <- predict(rf_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
+
+xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+xgb_preds_prob <- predict(xgb_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+
+knn_preds <- predict(knn_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
+knn_preds_prob <- predict(knn_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
+
+lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+lasso_preds_prob <- predict(lasso_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+
+all_preds <- bind_rows(rf_preds, xgb_preds, knn_preds, lasso_preds) # nb_preds
+
+all_preds_prob = bind_rows(rf_preds_prob, xgb_preds_prob, knn_preds_prob, lasso_preds_prob)
+
+pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosis, estimate = .pred_class)
+
+# rmse: root mean square error
+# rsq: R^2
+# mae: mean absolute error
+
+```
+```{r}
+
+pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble
+
+```
+```{r}
+
+for (m in unique(all_preds$model)) {
+  cm = all_preds |> filter(model == m) |> conf_mat(truth = binned_tuberculosis, .pred_class) |> autoplot(type = "heatmap")
+  print(cm)
+}
+
+```
+
+```{r}
+
+auc_scores = tibble()
+
+for (m in unique(all_preds$model)) {
+  
+  roc_curve = all_preds_prob |> filter(model == m) |> roc_curve(truth = binned_tuberculosis, .pred_0) |> autoplot() + ggtitle(paste("ROC Curve -", m))
+  auc_scores = bind_rows(auc_scores, tibble(m))
+  auc_scores = auc_scores |> mutate(roc_auc = (all_preds_prob |> filter(model == m) |> roc_auc(truth = binned_tuberculosis, .pred_0))$.estimate)
+  print(roc_curve)
+}
+
+auc_scores
+
+```
+
+```{r}
+
+# xgb model
+
+xgb_fit |> extract_fit_engine() |> vip()
+
+```
+```{r}
+
+# random forest 
+
+rf_fit |> extract_fit_engine() |> vip()
+
+```
+```{r}
+
+importance_df <- rf_fit |> extract_fit_engine() |> vip::vi()
+
+```
+
+
+```{r}
+
+
+# we want to rank the countries based on a score we give it which is the sum of the scaled features weighted by their importance found from our model
+# do for both infant mortality and tuberculosis 
+# outliers really affect the score
+
+
+importance_probs <- importance_df |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
+importnace_probs1 <- importance_df1 |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
+importance_probs  = importance_probs |> rename(scaled_tub = scaled)
+
+# got feature weight by doing the mean of both importnace scores from both the models for tuberculosis and infant mortality
+feat_weight = bind_cols(importance_probs |> select(Variable, scaled_tub), importnace_probs1 |> select(scaled)) |> mutate(new_weight = (scaled_tub + scaled) / (sum(scaled_tub) + sum(scaled))) |> select(Variable, new_weight)
+
+# got mean off all features by all the periods and scaled the features
+mean_featu_by_country = cleaned_merged_data |> group_by(Location) |> summarise(across(where(is.numeric) & !matches("Period"), ~ mean(.x, na.rm = TRUE)))
+scaled_mean_feat_country = mean_featu_by_country |> mutate(across(explanatory_feat, scale)) |> select(Location, explanatory_feat) |> mutate(across(everything(), ~ ifelse(is.nan(.), 0, .)))
+
+# did a weighted sum of all the scaled features with the weight computed
+long_data <- mean_featu_by_country |>
+  pivot_longer(cols = -Location, names_to = "Variable", values_to = "value")
+
+weighted_data <- long_data |>
+  inner_join(feat_weight, by = "Variable") |>
+  mutate(weighted_value = value * new_weight)
+
+health_risk_score <- weighted_data |>
+  group_by(Location) |>
+  summarise(score = sum(weighted_value, na.rm = TRUE))
+
+# top 10
+health_risk_score |> arrange(score) |> tail(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col() + coord_flip()
+
+# least 10
+health_risk_score |> arrange(score) |> head(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col() + coord_flip()
+
+```
+
+
