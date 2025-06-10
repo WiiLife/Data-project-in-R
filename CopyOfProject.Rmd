@@ -351,16 +351,19 @@ corr_explanatory = cor(cleaned_merged_data |> select(-c(Location, Period)) |> se
 corrplot::corrplot(corr_explanatory, method = "color", type = "full")
 
 ```
-
 ```{r, fig.width=20, fig.height=10}
 
 summary_data <- cleaned_merged_data |> group_by(Period) |> summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) |> ungroup()
-
 summary_long <- summary_data |> pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
 
-summary_long |> ggplot(aes(x = Period, y = mean_value, color = feature)) + geom_point() + geom_line()
+below_500 = summary_long |> filter(mean_value < 500)
+above_500 = summary_long |> filter(mean_value >= 500)
+
+below_500 |> ggplot(aes(x = Period, y = mean_value, color = feature)) + geom_point() + geom_line()
+above_500 |> ggplot(aes(x = Period, y = mean_value, colour = feature)) + geom_point() + geom_line()
 
 ```
+
 ```{r, fig.width=10, fig.height10}
 
 top_country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(desc(mean_infant_mortalilty)) |> head(10)
