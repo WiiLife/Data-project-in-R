@@ -167,6 +167,8 @@ countries = c(
     "State of Palestine", "Tuvalu", "Monaco", "San Marino", "Germany, Federal Republic (former)",
     "India (until 1975)", "Kiribati (until 1984)", "South Viet Nam (former)")
 
+length(countries)
+
 years <- 2019:1962
 
 merged_data = tibble(Location=countries) |> mutate(Period = list(years)) |> unnest(Period)
