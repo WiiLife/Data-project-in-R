@@ -32,8 +32,8 @@ We will frame this report around the following questions, moving from a more gen
 
 -   What indicators can we use to determine the best country, by quality of life?
 -   Which are the best countries, by quality of life?
--   Is there a large difference in countries from different regions of the world, say between an African country and a European one?
 -   Where would be the best place to move with the intent to start a family?
+-   Can we corroborate our findings using the World Happiness index?
 
 ### 2.2 Data sources
 
@@ -41,7 +41,7 @@ The data sets we chose represent data from the WHO, found on [Kaggle](https://ka
 We attempted to complete as much of the analysis as possible without using external data sets. 
 Below are any additional data we ended up using, for additional research and validation purposes.
 
-The data is separated into many different files, each of which only contains only one feature describing the state of the world, divided by country and by year. To use data like this, we need to determine which are the most relevant features for our research questions and how to evaluate them.
+The data is separated into 39 different files, each of which only contains only one feature describing the state of the world, divided by country and by year. To use data like this, we need to determine which are the most relevant features for our research questions and how to evaluate them.
 
 For one of the questions we also recovered some countries from [the World Happiness Report data](https://data.worldhappiness.report/table).
 
