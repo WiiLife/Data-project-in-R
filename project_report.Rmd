@@ -777,7 +777,7 @@ pred_tibble
 
 The next graph shows a required step in the report, which is also a useful tool to overview model performance and help fix issues with the model.
 
-The green lines represent the ideal shape of the graphs when checked by the "check_model()" function provided by R, and although our check of the basic linear regression model does not perfectly conform to the ideal, it does largely follow the ideal shape.
+The green lines represent the ideal shape of the graphs when checked by the "check_model()" function provided by perfomance library, and although our check of the basic linear regression model does not perfectly conform to the ideal, it does largely follow the ideal shape.
 
 WILLIAM PLEASE PROVIDE INTEL ON HOW TO READ THIS PART, I AM TIRED AND CANNOT DO IT BETTER THAN WRITTEN ABOVE!!
 
