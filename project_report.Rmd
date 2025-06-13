@@ -346,7 +346,7 @@ We proceeded to perform some ulterior cleaning, by normalising all the data and 
 
 After noticing a strange phenomenon in number of nurses, where the number of recorded nurses in Belize approached 3'000 per 10'000 people, we decided to remove it before continuing to the rest of the exploration, because it had a negative effect on the model performances.
 
-```{r, fig.width=10, fig.height10}
+```{r, fig.width=10, fig.height=7}
 
 feat_data = cleaned_merged_data |> select(-c(Location, Period))
 
@@ -491,7 +491,7 @@ happy_countries_2014
 # Let's look at a random feature
 select(happy_countries_2014, "Location", "Malaria incidence (per 10 000 population at risk)")
 
-sad_countries_2014 <- filter(cleaned_merged_data, Period == 2014, Location %in% bottom_10_happiest) 
+sad_countries_2014 <- filter(cleaned_merged_data, Period == 2014, Location %in% bottom_10_happiest_2014) 
 sad_countries_2014
 
 select(sad_countries_2014, "Location", "Malaria incidence (per 10 000 population at risk)")
@@ -557,7 +557,7 @@ The graphs also leave us questioning how come Iceland and San Marino did not ran
 
 Since we previously decided that the features we want to explore to evaluate a country are infant mortality and tuberculosis, let's take a look at the countries most affected by infant mortality rate and check how many line up with our 2014 happiest and least happy countries.
 
-```{r, fig.width=10, fig.height10}
+```{r, fig.width=10, fig.height=7}
 
 top_country_infant_mortality = cleaned_countries_2014 |> select(Location, infant_mortality_rate) |> arrange(desc(infant_mortality_rate)) |> head(10)
 least_country_infant_mortality = cleaned_countries_2014 |> select(Location, infant_mortality_rate) |> arrange(infant_mortality_rate) |> head(10)
@@ -586,7 +586,7 @@ print(paste("Number of countries that are in our happiest and saddest list, and 
 
 For an overall look, we also plotted the best and worst mean infant mortality rates (mean over each year since 2000).
 
-```{r, fig.width=10, fig.height10}
+```{r, fig.width=10, fig.height=7}
 
 top_country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(desc(mean_infant_mortalilty)) |> head(10)
 least_country_infant_mortality = cleaned_merged_data |> select(Location, infant_mortality_rate) |> group_by(Location) |> summarise(mean_infant_mortalilty = mean(infant_mortality_rate)) |> arrange(mean_infant_mortalilty) |> head(10)
@@ -1093,8 +1093,7 @@ We define the country score as:
 
 $$
 \text{RiskScore_{i}} = \sum_{j=1}^{n} \left( \frac{W_{tb,j} + W_{im,j}}{2} \right) * f_{i,j}
-$$
-Meaning that for each country we take the scaled mean of the feature importance between tuberculosis and infant mortality multiplied by the scaled sample values.
+$$ Meaning that for each country we take the scaled mean of the feature importance between tuberculosis and infant mortality multiplied by the scaled sample values.
 
 The final scoring is shown in the following graph, not determined by one specific year but instead using all data available between 2000 and 2019.
 
@@ -1136,6 +1135,7 @@ health_risk_score |> arrange(score) |> tail(10) |> ggplot(aes(x = reorder(Locati
 health_risk_score |> arrange(score) |> head(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col(fill = "tomato") + coord_flip()
 
 ```
+
 We see that the best overall countries to move to by our scoring system are Finland, Monaco and Germany, whereas the worst are South Sudan, Ethiopia and Somalia.
 
 #### 2.4.4 Can we corroborate our findings using the World Happiness index?
@@ -1170,7 +1170,7 @@ print(paste("Correct top 10:", top_counter, "      Correct bottom 10:", bot_coun
 
 ```
 
-Even using the happiness index for a single year to evaluate a score from different periods results in a good number of correctly identified best countries (which is where we intend to focus our attention), so we can say that our system works. 
+Even using the happiness index for a single year to evaluate a score from different periods results in a good number of correctly identified best countries (which is where we intend to focus our attention), so we can say that our system works.
 
 For a better proof of concept, we take the same idea but just using data from 2014 again.
 
@@ -1227,11 +1227,7 @@ print(paste("Correct top 10:", top_counter, "      Correct bottom 10:", bot_coun
 
 
 ```
+
 ### 3. Conclusion
 
-Using different models and statistical methods we were able to answer our questions finding that:
--   The best metrics with which to judge a country's wellbeing are infant mortality rate and cases of tuberculosis;
--   We can predict these idicators using linear regression and classification models respectively;
--   The best countries by quality of life are also the best countries in which to raise a family, and are Finland, Monaco and Germany;
--   Using the WHR data we can adequately, if not completely, corroborate our findings.
-
+Using different models and statistical methods we were able to answer our questions finding that: - The best metrics with which to judge a country's wellbeing are infant mortality rate and cases of tuberculosis; - We can predict these idicators using linear regression and classification models respectively; - The best countries by quality of life are also the best countries in which to raise a family, and are Finland, Monaco and Germany; - Using the WHR data we can adequately, if not completely, corroborate our findings.
