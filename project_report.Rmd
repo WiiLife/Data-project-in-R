@@ -23,13 +23,13 @@ library(vip)
 
 # Data Project & Hackathon 2 - Worldwide Well-being
 
-#### Authors: [William Ambrosetti](https://github.com/WiiLife), [Alexandra Biddiscombe](https://github.com/ambiddisco), [Youssef Sedra](https://github.com/ysedra)
+Authors: [William Ambrosetti](https://github.com/WiiLife), [Alexandra Biddiscombe](https://github.com/ambiddisco), [Youssef Sedra](https://github.com/ysedra)
 
 ## 0. Abstract
 
 We explore the idea of well-being and quality of life using different medicine-related features, through data distributed by the the WHO. We respond to questions such as "As the leader of this country, how can I improve the quality of life of my people?" and "As an unsatisfied inhabitant of this country, where can I move to have the best chance of having a healthy family and kids?".
 
-We come to the conclusion that the well-being of a country can be modeled through a few important explanatory features and described through specific outcomes, and model what we find to be the best results of the coutries.
+We come to the conclusion that the well-being of a country can be modeled through a few important explanatory features and described through specific outcomes, and model what we find to be the best results of the countries.
 
 We approach these questions from the perspective of well-meaning but not completely informed group of aliens, visiting Earth for the first time, in an attempt to model the idea of becoming data scientists and finding ourselves in front of new and unknown situations, where we may want to make logical conclusions but do not fully understand the topic at hand.
 
@@ -57,7 +57,7 @@ We will frame this report around the following questions, moving from a more gen
 
 The data sets we chose represent data from the WHO, found on [Kaggle](https://kaggle.com) at [World Health Statistics 2020 \| Complete \| Geo-Analysis](https://www.kaggle.com/datasets/utkarshxy/who-worldhealth-statistics-2020-complete), curated by [Zeus](https://www.kaggle.com/utkarshxy). We attempted to complete as much of the analysis as possible without using external data sets. Below are any additional data we ended up using, for additional research and validation purposes.
 
-The data is separated into 39 different files, each of which only contains only one feature describing the state of the world, divided by country and by year. To use data like this, we need to determine which are the most relevant features for our research questions and how to evaluate them.
+The data is separated into 39 different files, each of which contains only one feature describing the state of the world, divided by country and by year. To use data like this, we need to determine which are the most relevant features for our research questions and how to evaluate them.
 
 For one of the questions we also recovered some countries from [the World Happiness Report data](https://data.worldhappiness.report/table).
 
@@ -510,7 +510,7 @@ cleaned_countries_2014
 # plot every country feat 
 # make it into barplot (horizontal)
   
-#  colour any coutry with value between min and max
+#  colour any country with value between min and max
   
   
 # -> best outcome variable is infant mortality
