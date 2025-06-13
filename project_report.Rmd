@@ -693,7 +693,7 @@ final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
 
 ```
 
-Above is the evaluation of the k-NN model across the defined metrics, by number of neighbours.
+Above is the evaluation of the k-NN model across the defined metrics, by number of neighbours. The value of 3 neighbours comes up as a good value in most runs, so we select it as the best value.
 
 We also tuned the lasso regression model, by amount of regularisation, from none to fully regularised (0-1).
 
