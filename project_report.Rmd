@@ -25,6 +25,8 @@ library(vip)
 
 Authors: [William Ambrosetti](https://github.com/WiiLife), [Alexandra Biddiscombe](https://github.com/ambiddisco), [Youssef Sedra](https://github.com/ysedra)
 
+To see our project repository with presentation file and original code files (not recommended, they are not cleaned) see our GitHub repository [Data-project-in-R](https://github.com/WiiLife/Data-project-in-R/tree/master).
+
 ## 0. Abstract
 
 We explore the idea of well-being and quality of life using different medicine-related features, through data distributed by the the WHO. We respond to questions such as "As the leader of this country, how can I improve the quality of life of my people?" and "As an unsatisfied inhabitant of this country, where can I move to have the best chance of having a healthy family and kids?".
