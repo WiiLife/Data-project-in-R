@@ -21,7 +21,6 @@ library(discrim)
 library(vip)
 ```
 
-
 # Data Project & Hackathon 2 - Worldwide Well-being
 
 #### Authors: [William Ambrosetti](https://github.com/WiiLife), [Alexandra Biddiscombe](https://github.com/ambiddisco), [Youssef Sedra](https://github.com/ysedra)
@@ -49,15 +48,14 @@ We frame our questions as if asked by the CEO of a successful company, looking t
 We will frame this report around the following questions, moving from a more generic to a more specific subject:
 
 -   What indicators can we use to determine the best country, by quality of life?
+-   Can we predict these indicators, using explanatory features?
 -   Which are the best countries, by quality of life?
 -   Where would be the best place to move with the intent to start a family?
 -   Can we corroborate our findings using the World Happiness index?
 
 ### 2.2 Data sources
 
-The data sets we chose represent data from the WHO, found on [Kaggle](https://kaggle.com) at [World Health Statistics 2020 \| Complete \| Geo-Analysis](https://www.kaggle.com/datasets/utkarshxy/who-worldhealth-statistics-2020-complete), curated by [Zeus](https://www.kaggle.com/utkarshxy). 
-We attempted to complete as much of the analysis as possible without using external data sets. 
-Below are any additional data we ended up using, for additional research and validation purposes.
+The data sets we chose represent data from the WHO, found on [Kaggle](https://kaggle.com) at [World Health Statistics 2020 \| Complete \| Geo-Analysis](https://www.kaggle.com/datasets/utkarshxy/who-worldhealth-statistics-2020-complete), curated by [Zeus](https://www.kaggle.com/utkarshxy). We attempted to complete as much of the analysis as possible without using external data sets. Below are any additional data we ended up using, for additional research and validation purposes.
 
 The data is separated into 39 different files, each of which only contains only one feature describing the state of the world, divided by country and by year. To use data like this, we need to determine which are the most relevant features for our research questions and how to evaluate them.
 
@@ -99,7 +97,6 @@ All data is divided and stored by country and by year:
 
 -   **Location** : The country in which the value described was recorded;
 -   **Period** : The year in which the value described was recorded.
-
 
 ```{r}
 
@@ -258,9 +255,9 @@ merged_data = full_join(merged_data, birth_by_skilled_personel_data, by=c("Locat
 merged_data = full_join(merged_data, medical_doctors_data, by=c("Location", "Period"))
 merged_data = full_join(merged_data, pharmacists_data, by=c("Location", "Period"))
 merged_data = full_join(merged_data, infant_mortality_rate_data |> rename(infant_mortality_rate=`Both sexes`) |> select(-c(Male, Female)), by=c("Location", "Period"))
-merged_data = full_join(merged_data, maternal_mortality_ratio_data |> mutate(`Maternal mortality ratio (per 10 000 live births)`=`Maternal mortality ratio (per 100 000 live births)`*10) |> select(-c(`Maternal mortality ratio (per 100 000 live births)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, maternal_mortality_ratio_data |> mutate(`Maternal mortality ratio (per 10 000 live births)`=`Maternal mortality ratio (per 100 000 live births)`/10) |> select(-c(`Maternal mortality ratio (per 100 000 live births)`)), by=c("Location", "Period"))
 merged_data = full_join(merged_data, incidence_of_malaria_data |> mutate(`Malaria incidence (per 10 000 population at risk)`=`Malaria incidence (per 1 000 population at risk)`*10) |> select(-c(`Malaria incidence (per 1 000 population at risk)`)), by=c("Location", "Period"))
-merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`Incidence of tuberculosis (per 10 000 population per year)`=`Incidence of tuberculosis (per 100 000 population per year)`*10) |> select(-c(`Incidence of tuberculosis (per 100 000 population per year)`)), by=c("Location", "Period"))
+merged_data = full_join(merged_data, incidence_of_tuberculosis_data |> mutate(`Incidence of tuberculosis (per 10 000 population per year)`=`Incidence of tuberculosis (per 100 000 population per year)`/10) |> select(-c(`Incidence of tuberculosis (per 100 000 population per year)`)), by=c("Location", "Period"))
 
 merged_data
 
@@ -274,7 +271,6 @@ explanatory_feat = setdiff(colnames(merged_data), outcome_feat)
 explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
 
 ```
-
 
 The size of the data table is determined by the number of countries (200) and the timespan (1962 - 2019) for a total of 11'600 rows and 22 columns. Of these, 200'000 are missing values. The missing data needs to be dealt with before any real answers can be properly explored. To minimise this issue, we looked at missing data by year and removed the worst period, keeping data only after the year 2'000, then looking at the missing values per feature and choosing to reject any features with more than a limit of 3'000 missing points, set at that number to not remove too many features and still keep the data usable. This means removing 6 features, of which 5 outcomes, so to verify that we are not losing too much information we visualised some initial correlation plots between all outcome features, verifying high values of correlation between the columns to be removed and those kept, thus ensuring not too much information is lost.
 
@@ -302,7 +298,6 @@ All data is still divided and stored by country and by year:
 
 -   **Location** : The country in which the value described was recorded;
 -   **Period** : The year in which the value described was recorded.
-
 
 ```{r}
 
@@ -347,10 +342,9 @@ cleaned_merged_data <- merged_data %>%
 
 ```
 
-We proceeded to perform some ulterior cleaning, by normalising all the data and plotting the outliers. 
+We proceeded to perform some ulterior cleaning, by normalising all the data and plotting the outliers.
 
 After noticing a strange phenomenon in number of nurses, where the number of recorded nurses in Belize approached 3'000 per 10'000 people, we decided to remove it before continuing to the rest of the exploration, because it had a negative effect on the model performances.
-
 
 ```{r, fig.width=10, fig.height10}
 
@@ -381,28 +375,28 @@ cleaned_merged_data = cleaned_merged_data |> anti_join(outliers, by = "Location"
 
 ```
 
-
 ### 2.4 Data exploration
 
-To inform ourselves about the general data distribution, we started by plotting the the average of each feature by year (over all countries), hoping to see a linear progression towards better quality of life. 
+#### 2.4.1 What indicators can we use to determine the best country, by quality of life?
 
+To inform ourselves about the general data distribution, we started by plotting the the average of each feature by year (over all countries), hoping to see a linear progression towards better quality of life.
 
 ```{r, fig.width=20, fig.height=10}
 
 summary_data <- cleaned_merged_data |> group_by(Period) |> summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) |> ungroup()
 summary_long <- summary_data |> pivot_longer(cols = -Period, names_to = "feature", values_to = "mean_value")
 
-below_500 = summary_long |> filter(mean_value < 500)
-above_500 = summary_long |> filter(mean_value >= 500)
+below_100 = summary_long |> filter(mean_value < 100)
+above_100 = summary_long |> filter(mean_value >= 100)
 
-below_500 |> ggplot(aes(x = Period, y = mean_value, color = feature)) + geom_point() + geom_line()
-above_500 |> ggplot(aes(x = Period, y = mean_value, colour = feature)) + geom_point() + geom_line()
+below_100 |> ggplot(aes(x = Period, y = mean_value, color = feature)) + geom_point() + geom_line()
+above_100 |> ggplot(aes(x = Period, y = mean_value, colour = feature)) + geom_point() + geom_line()
 
 ```
 
-The plot in divided into two sections as the values are very different, so the first plot (data with values under 500) would be completely invisible with the elements of the second plot also in the same file.
+The plot in divided into two sections as the values are very different, so the first plot (data with values under 100) would be completely invisible with the elements of the second plot also in the same file.
 
-Thanks to these graphs we can see that the highest rate of occurrence of our features are the incidents of tuberculosis and those of malaria, and that as we expected, all features related to deaths have been steadily decreasing over time. Features relating to infrastructure (basic services like drinking and sanitation) have seen a gradual increase, with the exception of nursing and midwife personnel.
+Thanks to these graphs we can see that the highest rate of occurrence of our features are the incidents of malaria and neonatal mortality cases, and that as we expected, all features related to deaths have been steadily decreasing over time. Features relating to infrastructure (basic services like drinking and sanitation) have seen a gradual increase, with the exception of nursing and midwife personnel.
 
 Next we plotted a series of correlation matrices to see if any features are strongly correlated with others, and to find the most important features to create a model with, to simply determine the quality of life in a country.
 
@@ -414,7 +408,7 @@ ggpairs(cleaned_merged_data |> select(`Dentists (per 10,000)`, `Pharmacists  (pe
 
 ```
 
-Next, we view the correlations between all outcome features and between all decision features. 
+Next, we view the correlations between all outcome features and between all decision features.
 
 ```{r}
 
@@ -447,22 +441,150 @@ We also plotted the decision feature correlations, which we do not intend to cha
 
 After this exploration, we came to the conclusion that we can use two features to determine the quality of life of a country: Incidents of tuberculosis, and infant mortality rate. This means we are including two features that act completely differently from each other, and so we are gaining new information with both features. By including a feature highly correlated to infant mortality, we would not be adding new information, as we can already obtain it by looking at the infant mortality rate.
 
+Let's take a sanity check by comparing our outcome ideas with the happiest and least happy countries according to the World Happiness Report data.
+
+First of all, we need to find a good year to make the comparison, ideally one not too long ago and one with few missing values.
+
+```{r}
+# this does not work, try again
+# year_list <- c()
+# for (year in 2000:2019) {
+#   year_list <- c(year_list, [as.character(year)] = sum(is.na(filter(cleaned_merged_data, Period == year))))
+# } 
+# print(year_list)
+
+year_list <- c()
+for (year in 2000:2019) {
+  value <- sum(is.na(filter(cleaned_merged_data, Period == year)))
+  year_list <- c(year_list, setNames(value, year))
+}
+
+# check if it worked
+#print(year_list)
+
+# Sort by number of NA values
+sorted_years <- sort(year_list)
+
+print(sorted_years)
+
+```
+
+The best year by missing values would be 2010, followed by 2014, 2013 and 2015.
+
+There are fewer missing values in 2010, but 2014 is close behind and only changes in missing values by a small count
+
+A good date to explore is 2015, although there are fewer missing values in 2010, 2015 is closer to the actual date.
+
+The top 10 countries by happiness index were recovered from [the World Happiness Report data](https://data.worldhappiness.report/table). Please not that the total list of countries in 2014 only goes up to 158, whereas we have 200 countries in our list, so the names for the least happy (sad) countries may not line up.
+
+```{r}
+# Copying data from the World Happiness Report Table:
+
+# Top 10 countries:
+top_10_happiest_2014 = c("Switzerland", "Denmark", "Norway", "Canada", "Finland", "Netherlands", "Sweden", "New Zealand", "Australia", "Israel")
+bottom_10_happiest_2014 = c("Togo", "Burundi", "Benin", "Rwanda", "Afghanistan", "Burkina Faso", "Côte d'Ivoire", "Guinea", "Chad", "Madagascar")
+
+
+happy_countries_2014 <- filter(cleaned_merged_data, Period == 2014, Location %in% top_10_happiest_2014) 
+happy_countries_2014
+
+# Let's look at a random feature
+select(happy_countries_2014, "Location", "Malaria incidence (per 10 000 population at risk)")
+
+sad_countries_2014 <- filter(cleaned_merged_data, Period == 2014, Location %in% bottom_10_happiest) 
+sad_countries_2014
+
+select(sad_countries_2014, "Location", "Malaria incidence (per 10 000 population at risk)")
+
+```
+
+```{r}
+cleaned_countries_2014 <- filter(cleaned_merged_data, Period == 2014)
+cleaned_countries_2014
+```
+
+```{r, fig.width=10, fig.height=10}
+
+# bar plot of every country's outcome features 
+
+# plot every country feat 
+# make it into barplot (horizontal)
+  
+#  colour any coutry with value between min and max
+  
+  
+# -> best outcome variable is infant mortality
+
+country_col <- "Location"  # Replace with your actual country name column
+
+for (feat in outcome_feat) {
+  cat("Plotting:", feat, "\n")
+
+  # Extract feature values and remove NA rows
+  df_feat <- cleaned_countries_2014[, c(country_col, feat)]
+  df_feat <- df_feat[!is.na(df_feat[[feat]]), ]
+
+  # Define min and max for each feature
+  min_value <- min(happy_countries_2014[, c(country_col, feat)][[feat]])
+  max_value <- max(happy_countries_2014[, c(country_col, feat)][[feat]])
+
+  # evaluating whether column in best region or not, then reorder and select only some (otherwise it's too cluttered)
+  df_feat$highlight <- ifelse(df_feat[[feat]] >= min_value & df_feat[[feat]] <= max_value, "In Range", "Out Of Range")
+  df_feat[[country_col]] <- factor(df_feat[[country_col]], levels = df_feat[[country_col]][order(df_feat[[feat]], decreasing = TRUE)])
+  df_feat <- df_feat[order(df_feat[[feat]], decreasing = FALSE), ][1:min(80, nrow(df_feat)), ]
+  
+  # plotting part
+  p <- ggplot(df_feat, aes(x = .data[[country_col]], y = .data[[feat]], fill = highlight)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_fill_manual(values = c("In Range" = "skyblue", "Out Of Range" = "tomato")) +
+    labs(title = paste("Feature:", feat),
+         x = "Country", y = feat) +
+    theme_minimal()
+
+  print(p)
+}
 
 
 
+```
+
+These plots show the countries ranked by their counts of the outcome variable, per each variable. Highlighted in blue are those countries within the minimum and maximum of the top 10 countries, in red instead are those outside.
+
+Having seen this graph, we conclude that our outcome variables are indeed a good metric with which to rate the countries, as it seems that the happiest countries in a given year do rank with fewer deaths compared to the other countries overall. Malaria may not be the best one, as none of the top happiest countries have a single recorded incident that year, so much so that we cannot use the information from it to evaluate other countries.
+
+The graphs also leave us questioning how come Iceland and San Marino did not rank among the happiest countries in the year we selected, 2014, but it is not a question we seek to answer here.
+
+Since we previously decided that the features we want to explore to evaluate a country are infant mortality and tuberculosis, let's take a look at the countries most affected by infant mortality rate and check how many line up with our 2014 happiest and least happy countries.
+
+```{r, fig.width=10, fig.height10}
+
+top_country_infant_mortality = cleaned_countries_2014 |> select(Location, infant_mortality_rate) |> arrange(desc(infant_mortality_rate)) |> head(10)
+least_country_infant_mortality = cleaned_countries_2014 |> select(Location, infant_mortality_rate) |> arrange(infant_mortality_rate) |> head(10)
+
+top_least_country_infant_mortality = bind_rows(top_country_infant_mortality, least_country_infant_mortality)
+
+top_least_country_infant_mortality |> ggplot(aes(x = reorder(Location, infant_mortality_rate), y = infant_mortality_rate)) + geom_col() + coord_flip() + labs(title = "top 10 and least 10 countries with mean infant mortality rate")
+
+```
+
+```{r}
+counter = 0
+for (country in top_least_country_infant_mortality$Location) {
+  if (country %in% top_10_happiest_2014) {
+    counter <- counter + 1
+  }
+  else if (country %in% bottom_10_happiest_2014) {
+    counter <- counter + 1
+  }
+} 
+
+print(paste("Number of countries that are in our happiest and saddest list, and in the top or bottom of our infant mortality data:", counter))
 
 
+```
 
-
-
-
-
-
-From now on, we will evaluate countries using those 
-
-
-This showed us that mortality rates have been steadily decreasing, access to sanitation has not had the greatest change over time, and rates of disease have slowly but surely lessened over time. From this graph we determined it was important to select some features as the most important with which to judge a country. How can we select which is the best country to live in if we cannot determine what features make up the best country? 
-
+For an overall look, we also plotted the best and worst mean infant mortality rates (mean over each year since 2000).
 
 ```{r, fig.width=10, fig.height10}
 
@@ -474,3 +596,642 @@ top_least_country_infant_mortality = bind_rows(top_country_infant_mortality, lea
 top_least_country_infant_mortality |> ggplot(aes(x = reorder(Location, mean_infant_mortalilty), y = mean_infant_mortalilty)) + geom_col() + coord_flip() + labs(title = "top 10 and least 10 countries with mean infant mortality rate")
 
 ```
+
+#### 2.4.2 Can we predict these indicators, using explanatory features?
+
+##### Infant Mortality Rate
+
+Now that we have explained at length our first answer, "What indicators can we use to determine the best country, by quality of life?", let's start making some models, predicting outcomes, and explaining why.
+
+Our selected outcome features that we determined as the most important are, of course, "infant mortality rate" and "incidents of tuberculosis", so we will start with the infant mortality.
+
+We build several linear regression model, that aims to predict a country's rate of infant mortality (per 10'000 live births) using the explanatory (or decision) features. We use multiple models: a simple linear regression, a random forest model, XGBoost, lasso and k-NN for regression.
+
+First of all, we separate the total contries dataframe, containing all years from 2000 to 2019 into a training and a testing set.
+
+```{r}
+
+explanatory_feat_infant_mortality = c(explanatory_feat, "infant_mortality_rate")
+
+merged_train_test_split = cleaned_merged_data |> select(all_of(explanatory_feat_infant_mortality)) |> filter(!is.na(infant_mortality_rate)) |> initial_split(prop=0.8)
+
+merged_data_train = training(merged_train_test_split)
+merged_data_test = testing(merged_train_test_split)
+
+
+```
+
+Then we define the recipes for the models.
+
+```{r}
+
+# recipes
+
+base_recipe = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_normalize(all_numeric_predictors())
+
+recipe_imputed = recipe(merged_data_train) |> update_role(infant_mortality_rate, new_role = "outcome") |> update_role(all_of(explanatory_feat), new_role = "predictor") |> step_impute_mean(all_numeric_predictors()) |> step_normalize(all_numeric_predictors())
+
+```
+
+And the model definition, using recipes and workflows.
+
+```{r}
+
+# models
+
+lin_reg <- linear_reg() |> set_engine("lm")
+rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("regression")
+xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("regression")
+lasso_model <- linear_reg(penalty = tune(), mixture = 1) |> set_engine("glmnet") |> set_mode("regression")
+knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("regression")
+
+```
+
+```{r}
+
+# workflows
+
+lr_workflow = workflow() |> add_model(lin_reg) |> add_recipe(recipe_imputed)
+rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(recipe_imputed)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(base_recipe)
+knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(recipe_imputed)
+lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(recipe_imputed)
+
+```
+
+We define the metrics: Root Mean Squared Error (RMSE), Mean Absolute Error (MAE), R-Squared (RSQ or R2).
+
+When evaluating a model, we want to see the error rates as low as possible (RMSE, MAE \~ 0) and the R2 score as close to 1 as possible in the ideal model.
+
+```{r}
+metrics <- metric_set(yardstick::rmse, yardstick::mae, yardstick::rsq)
+```
+
+The k-NN model requires some extra steps, so we decided to tune it by number of neighbours, due to its poor performance in original tests. We will do the same with lasso, but not the other models as they scored better in initial tests already.
+
+```{r}
+# cross validation for k
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+knn_grid <- tibble(neighbors = seq(1, 10, by = 1))
+
+knn_tune_results <- tune_grid(
+  knn_workflow,
+  resamples = cv_folds,
+  grid = knn_grid,
+  metrics = metrics
+)
+
+autoplot(knn_tune_results)
+
+best_k <- select_best(knn_tune_results, metric = "rmse")
+
+final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
+
+```
+
+Above is the evaluation of the k-NN model across the defined metrics, by number of neighbours.
+
+We also tuned the lasso regression model, by amount of regularisation, from none to fully regularised (0-1).
+
+```{r}
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+lasso_grid <- tibble(penalty = seq(0.01, 1, by=0.01))
+
+lasso_tune_results <- tune_grid(
+  lasso_workflow,
+  resamples = cv_folds,
+  grid = lasso_grid,
+  metrics = metrics
+)
+
+autoplot(lasso_tune_results)
+
+best_reg <- select_best(lasso_tune_results, metric = "rmse")
+
+final_lasso_workflow <- finalize_workflow(lasso_workflow, best_reg)
+
+```
+
+Above is the performance of the lasso model by amount of regularisation, we found that less regularisation brings us a better model.
+
+Next, we use our models to predict the infant mortality rates of different countries, using the training data set aside earlier, and store the predictions to evaluate the models using our three metrics (RMSE, MAE, RSQ).
+
+```{r}
+
+lr_fit  <- fit(lr_workflow, data = merged_data_train)
+rf_fit  <- fit(rf_workflow, data = merged_data_train)
+xgb_fit <- fit(xgb_workflow, data = merged_data_train)
+knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
+
+
+lr_preds <- predict(lr_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Linear")
+
+rf_preds <- predict(rf_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Random Forest")
+
+xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "XGBoost")
+
+knn_preds <- predict(knn_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Knn")
+
+lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(infant_mortality_rate)) %>%
+  mutate(model = "Lasso")
+
+all_preds <- bind_rows(lr_preds, rf_preds, xgb_preds, knn_preds, lasso_preds)
+
+pred_tibble = all_preds %>%
+  group_by(model) %>%
+  metrics(truth = infant_mortality_rate, estimate = .pred)
+
+# rmse: root mean square error
+# rsq: R^2
+# mae: mean absolute error
+```
+
+Finally, we plot the performances of our linear regression models, which use data from the explanatory (or decision) features of our data to predict the rate of infant mortality of a given country in a given year. We found that the random forest model performs the best, having the lowest RMSE and MAE, and the highest R-squared (or similarity) of all the models, followed in close second by XGBoost. Even with tuning, the k-NN and Lasso models did not quite cut it.
+
+```{r}
+
+pred_tibble |> filter(.metric != "rsq") |> ggplot() + geom_col(aes(x = reorder(model, .estimate), y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble |> filter(.metric == "rsq") |> ggplot() + geom_col(aes(x = reorder(model, .estimate), y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble
+
+
+```
+
+The next graph shows a required step in the report, which is also a useful tool to overview model performance and help fix issues with the model.
+
+The green lines represent the ideal shape of the graphs when checked by the "check_model()" function provided by R, and although our check of the basic linear regression model does not perfectly conform to the ideal, it does largely follow the ideal shape.
+
+WILLIAM PLEASE PROVIDE INTEL ON HOW TO READ THIS PART, I AM TIRED AND CANNOT DO IT BETTER THAN WRITTEN ABOVE!!
+
+```{r, fig.width=10, fig.height=6}
+
+lr_fit |> extract_fit_engine() |> check_model()
+
+```
+
+Lastly, we explain the model's outputs by plotting the importance of the features in the basic linear regression model. This plot shows longer lines for more important features, listed first, and shorter ones for the least important.
+
+In this case we see that most of the decision for the predicted rate of infant mortality relies on the feature "Population using at least basic drinking water services (%)", followed by "Births attended by skilled health personnel (%)", indicating that we can determine the rate of infant mortality mostly by looking at the amount of drinking water services available. The feature is so important in fact, that we can assume both are correlated, either directly or indirectly. In this case, we could likely assume that a country that is rich has more available infrastructer due to more money, and also better healthcare for the same reason, so the features could be tied to the countries' GDP. In a future project, where er can afford a more in depth exploration of the world in data, we could go further into this subject and explore the correlations using more data, to find a better answer.
+
+```{r}
+
+# got explanation for linear regression 
+
+lr_fit |> extract_fit_engine() |> vip()
+
+```
+
+Since the model that performed the best was the random forest model, we also looked at its feature importances. We can see that there is a slight difference, where in the basic linear regression a huge amount of importance is given to drinking water services, in this second version we have an ever so slightly more balanced model, where more importance goes to the other features, helping the model perform even better in this case. We do note though that the feature "Population using at least basic drinking water services (%)" is still the most influential on the model's decision.
+
+```{r}
+
+rf_fit |> extract_fit_engine() |> vip()
+
+```
+
+```{r}
+
+importance_df1 <- rf_fit |> extract_fit_engine() |> vip::vi()
+importance_df1
+
+```
+
+##### Cases of Tuberculosis
+
+Having created models to predict the rate of infant mortality incidents by country and year, we are left with the other more unique outcome feature, cases of tuberculosis.
+
+For this experiment, we decided to divide the countries by risk of tuberculosis. We assigned a middle value, the mean of cases over all countries over the period 2000 - 2019, and divided countries into categories: "low risk" for countries falling under or equal to the middle value, and "high risk" for those falling above it by number of cases in a given year. Mechanically, the model sees low risk as "0" and high risk as "1", and it uses the explanatory (or decision) features to predict which category a given country in a given year falls into, as a binary classification.
+
+We selected to use 4 models for the classification: k-NN, random forest, XGBoost and lasso for classification.
+
+We start the modelling process by dividing the initial country data into training and testing sets.
+
+```{r}
+
+mean_tub <- mean(cleaned_merged_data$`Incidence of tuberculosis (per 10 000 population per year)`, na.rm = TRUE)
+
+# get binned tuberculosis based on mean
+cleaned_merged_data <- cleaned_merged_data |> mutate(binned_tuberculosis = if_else(`Incidence of tuberculosis (per 10 000 population per year)` > mean_tub, 1, 0)) |> filter(!is.na(binned_tuberculosis)) |> mutate(binned_tuberculosis = as.factor(binned_tuberculosis))
+
+data_for_model = cleaned_merged_data |> select(all_of(explanatory_feat), binned_tuberculosis)
+
+data_split <- initial_split(data_for_model, prop = 0.8, strata = binned_tuberculosis) # strata maintains proportion of binned tuberculosis in training and testing
+merged_data_train <- training(data_split)
+merged_data_test <- testing(data_split)
+
+```
+
+We also define the recies and workflows.
+
+```{r}
+
+# recipe for classification
+
+imputed_rec <- recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_impute_mean(all_numeric_predictors()) |>
+  # step_impute_mode(all_nominal_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+basic_rec <-recipe(binned_tuberculosis ~ ., data = merged_data_train) |>
+  step_normalize(all_numeric_predictors())
+
+```
+
+```{r}
+
+# models
+
+# nb_model <- naive_Bayes(smoothness = tune(), Laplace = 0.01) |> set_engine("KlaR") |> set_mode("classification")
+knn_model <- nearest_neighbor(neighbors = tune(), weight_func = "rectangular") |> set_engine("kknn") |> set_mode("classification")
+rf_model  <- rand_forest() |> set_engine("ranger", importance = "permutation") |> set_mode("classification")
+xgb_model <- boost_tree()  |> set_engine("xgboost") |> set_mode("classification")
+lasso_model <- logistic_reg(penalty = tune(), mixture = 1) |> set_engine("glmnet") |> set_mode("classification")
+
+```
+
+```{r}
+
+# workflows
+
+# nb_workflow = workflow() |> add_model(nb_model) |> add_recipe(imputed_rec)
+rf_workflow  <- workflow() |> add_model(rf_model) |> add_recipe(imputed_rec)
+xgb_workflow <- workflow() |> add_model(xgb_model) |> add_recipe(basic_rec) # no need to impute
+knn_workflow <- workflow() |> add_model(knn_model) |> add_recipe(imputed_rec)
+lasso_workflow <- workflow() |> add_model(lasso_model) |> add_recipe(imputed_rec)
+
+```
+
+The metrics we selected for the classification models are: accuracy, precision, recall and f-measure.
+
+Accuracy represents the number of correct classification over the number of total predictions, precision is the proportion of correctly classified actual positives over everything classified as positive, recall is the number of correctly identified positive predictions over the total number of actual positives, and f-measure which is calculated as follows: F-measure = 2 \* Precision \* Recall / (Precision + Recall)
+
+F-measure is usually used to calculate imbalance in precision and recall, and it summarises the model's performance by using multiple metrics.
+
+When evaluating a model, we want to see all the metrics as close to 1 as possible in the ideal model.
+
+```{r}
+metrics <- metric_set(yardstick::accuracy, yardstick::precision, yardstick::recall, yardstick::f_meas) 
+```
+
+```{r}
+# cross validation for smoothness
+
+# cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+# smooth_grid <- tibble(smoothness = seq(1, 10, by = 1))
+
+# smooth_tune_results <- tune_grid(nb_workflow, resamples = cv_folds, grid = smooth_grid, metrics = metrics)
+
+# autoplot(smooth_tune_results)
+
+# best_smooth <- select_best(smooth_tune_results, metric = "accuracy")
+
+# final_knn_workflow <- finalize_workflow(nb_workflow, best_smooth)
+
+```
+
+Once again, we need to tune the k-NN model because it has a lower performance than some of the other models in determining a high or low risk country in tuberculosis cases.
+
+```{r}
+# cross validation for k
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+knn_grid <- tibble(neighbors = seq(1, 30, by = 1))
+
+knn_tune_results <- tune_grid(
+  knn_workflow,
+  resamples = cv_folds,
+  grid = knn_grid,
+  metrics = metrics
+)
+
+autoplot(knn_tune_results)
+
+best_k <- select_best(knn_tune_results, metric = "accuracy")
+
+final_knn_workflow <- finalize_workflow(knn_workflow, best_k)
+
+```
+
+The above graph is not ideal, as we see that for different numbers of neighbours we end up trading accuracy and recall for precision.
+
+Next, we train the Lasso model again, using regularisation as our tuning metric.
+
+```{r}
+
+cv_folds <- vfold_cv(merged_data_train, v = 5)
+
+lasso_grid <- tibble(penalty = seq(0.0001, 1, by=0.01))
+
+lasso_grid <- grid_regular(penalty(), levels = 10)
+
+lasso_tune_results <- tune_grid(
+  lasso_workflow,
+  resamples = cv_folds,
+  grid = lasso_grid,
+  metrics = metrics
+)
+
+autoplot(lasso_tune_results)
+
+best_reg <- select_best(lasso_tune_results, metric = "accuracy")
+
+final_lasso_workflow <- finalize_workflow(lasso_workflow, best_reg)
+
+show_notes(lasso_tune_results)
+
+```
+
+In this case again, we see that less regularisation is beneficial in all cases except recall, but we choose to prioritise the other metrics and so go for a low regularisation.
+
+Next, we use our models to predict the risk of tuberculosis in a given country and period, using the training data set aside earlier, and store the predictions to evaluate the models using our four metrics (Accuracy, precision, recall and f-measure).
+
+```{r}
+
+# nb_fit  <- fit(nb_workflow, data = merged_data_train)
+rf_fit  <- fit(rf_workflow, data = merged_data_train)
+xgb_fit <- fit(xgb_workflow, data = merged_data_train)
+knn_fit <- fit(final_knn_workflow, data = merged_data_train)
+lasso_fit <- fit(final_lasso_workflow, data = merged_data_train)
+
+# nb_preds <- predict(nb_fit, merged_data_test) %>%
+  # bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  # mutate(model = "Linear")
+
+rf_preds <- predict(rf_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
+rf_preds_prob <- predict(rf_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Random Forest")
+
+xgb_preds <- predict(xgb_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+xgb_preds_prob <- predict(xgb_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "XGBoost")
+
+knn_preds <- predict(knn_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
+knn_preds_prob <- predict(knn_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Knn")
+
+lasso_preds <- predict(lasso_fit, merged_data_test) %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+lasso_preds_prob <- predict(lasso_fit, merged_data_test, type = "prob") %>%
+  bind_cols(merged_data_test %>% select(binned_tuberculosis)) %>%
+  mutate(model = "Lasso")
+
+all_preds <- bind_rows(rf_preds, xgb_preds, knn_preds, lasso_preds) # nb_preds
+
+all_preds_prob = bind_rows(rf_preds_prob, xgb_preds_prob, knn_preds_prob, lasso_preds_prob)
+
+pred_tibble = all_preds |> group_by(model) |> metrics(truth = binned_tuberculosis, estimate = .pred_class)
+
+# rmse: root mean square error
+# rsq: R^2
+# mae: mean absolute error
+
+```
+
+```{r}
+
+pred_tibble |> ggplot() + geom_col(aes(x = model, y = .estimate, fill = .metric), position = position_dodge())
+
+pred_tibble
+
+```
+
+Having plotted the evaluation scores of each model, we see once again that the random forest model performs best for classification, this time closely followed by k-NN classifier and all the other models close behind.
+
+We also plot the individual confusion matrices for each model, showing how many predictions are correct, by predicted and actual values.
+
+Interestingly, in the confusion matrices we see that the lasso model has the highest rate of false negatives.
+
+```{r}
+
+for (m in unique(all_preds$model)) {
+  cm = all_preds |> filter(model == m) |> conf_mat(truth = binned_tuberculosis, .pred_class) |> autoplot(type = "heatmap") +
+    ggtitle(paste("CM -", m))
+  print(cm)
+}
+
+```
+
+In evaluating the models, we also look at the ROC (Receiver-Operating Characteristic) curves, which in the ideal case should be as steep as possible, and it seems that our models perform rather well again, with lasso coming last.
+
+```{r}
+
+auc_scores = tibble()
+
+for (m in unique(all_preds$model)) {
+  
+  roc_curve = all_preds_prob |> filter(model == m) |> roc_curve(truth = binned_tuberculosis, .pred_0) |> autoplot() + ggtitle(paste("ROC Curve -", m))
+  auc_scores = bind_rows(auc_scores, tibble(m))
+  auc_scores = auc_scores |> mutate(roc_auc = (all_preds_prob |> filter(model == m) |> roc_auc(truth = binned_tuberculosis, .pred_0))$.estimate)
+  print(roc_curve)
+}
+
+auc_scores
+
+```
+
+Lastly, to better understand out models we plot the feature importances for two of the models, in the first case XGBoost which performed within the mean as opposed to the other models, and here again we see that the most important feature by a long stride is "Population using at least basic drinking-water services (%)". In contrast, the better performing random forest model, whose feature importance graph is shown underneath XGBoost's, has less of a difference in feature importances even with the same most important one. We also see that the second most important feature changes from "total_sanitation_services" to "Medical doctor (per 10'000)" from one model to the other.
+
+Thanks to both the linear regression models and the classification models, we can determine that the most important determining feature overall is the amount of drinking water services available to the population in a certain country and a certain year.
+
+```{r}
+
+# xgb model
+
+xgb_fit |> extract_fit_engine() |> vip()
+
+```
+
+```{r}
+
+# random forest 
+
+rf_fit |> extract_fit_engine() |> vip()
+
+```
+
+```{r}
+
+importance_df <- rf_fit |> extract_fit_engine() |> vip::vi()
+
+```
+
+#### 2.4.3 Which are the best countries, by quality of life?
+
+After all our exploration, it is time to answer the most important question, "Which are the best countries, by quality of life?". This question in this case will also answer our other question, "Where would be the best place to move with the intent to start a family?": since we explored the most important outcome variables of a country and explicitly set one of them to have to do with child mortality, we can assume that the best country we find will also provide us a good country in which to raise a family, and specifically children, who are the most vulnerable.
+
+We can use our outcome variables to rank the countries by a score, setting the more desirable countries to have a higher score, and the least desirable to have a lower one.
+
+We define the country score as:
+
+$$
+\text{RiskScore_{i}} = \sum_{j=1}^{n} \left( \frac{W_{tb,j} + W_{im,j}}{2} \right) * f_{i,j}
+$$
+Meaning that for each country we take the scaled mean of the feature importance between tuberculosis and infant mortality multiplied by the scaled sample values.
+
+The final scoring is shown in the following graph, not determined by one specific year but instead using all data available between 2000 and 2019.
+
+```{r}
+
+
+# we want to rank the countries based on a score we give it which is the sum of the scaled features weighted by their importance found from our model
+# do for both infant mortality and tuberculosis 
+# outliers really affect the score
+
+
+importance_probs <- importance_df |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
+importnace_probs1 <- importance_df1 |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
+importance_probs  = importance_probs |> rename(scaled_tub = scaled)
+
+# got feature weight by doing the mean of both importnace scores from both the models for tuberculosis and infant mortality
+feat_weight = bind_cols(importance_probs |> select(Variable, scaled_tub), importnace_probs1 |> select(scaled)) |> mutate(new_weight = (scaled_tub + scaled) / (sum(scaled_tub) + sum(scaled))) |> select(Variable, new_weight)
+
+# got mean off all features by all the periods and scaled the features
+mean_featu_by_country = cleaned_merged_data |> group_by(Location) |> summarise(across(where(is.numeric) & !matches("Period"), ~ mean(.x, na.rm = TRUE)))
+scaled_mean_feat_country = mean_featu_by_country |> mutate(across(explanatory_feat, scale)) |> select(Location, explanatory_feat) |> mutate(across(everything(), ~ ifelse(is.nan(.), 0, .)))
+
+# did a weighted sum of all the scaled features with the weight computed
+long_data <- mean_featu_by_country |>
+  pivot_longer(cols = -Location, names_to = "Variable", values_to = "value")
+
+weighted_data <- long_data |>
+  inner_join(feat_weight, by = "Variable") |>
+  mutate(weighted_value = value * new_weight)
+
+health_risk_score <- weighted_data |>
+  group_by(Location) |>
+  summarise(score = sum(weighted_value, na.rm = TRUE))
+
+# top 10
+health_risk_score |> arrange(score) |> tail(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col(fill = "seagreen") + coord_flip()
+
+# least 10
+health_risk_score |> arrange(score) |> head(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col(fill = "tomato") + coord_flip()
+
+```
+We see that the best overall countries to move to by our scoring system are Finland, Monaco and Germany, whereas the worst are South Sudan, Ethiopia and Somalia.
+
+#### 2.4.4 Can we corroborate our findings using the World Happiness index?
+
+Since our scoring system uses data from all years and not one specific one, we will attempt to evaluate our system using the most recent rankings of the World Happiness Data, using rankings from 2024.
+
+Note once again that the number of countries in our dataframe goes up to 200, but in the world happiest countries for the year 2024 it only goes up to 147, so we expect the worst countries to not line up very well.
+
+```{r}
+top_10_happiest_2024 = c("Finland", "Denmark", "Iceland", "Sweden", "Netherlands", "Costa Rica", "Norway", "Israel", "Luxembourg", "Mexico")
+bottom_10_happiest_2024 = c("Afghanistan", "Sierra Leone", "Lebanon", "Malawi", "Zimbabwe", "Botswana", "Democratic Republic of the Congo", "Yemen", "Comoros", "Lesotho")
+
+
+predicted_best_countries <- health_risk_score |> arrange(score) |> tail(10) |> select(Location)
+predicted_worst_countries <- health_risk_score |> arrange(score) |> head(10) |> select(Location)
+
+top_counter = 0
+for (country in predicted_best_countries$Location) {
+  if (country %in% top_10_happiest_2024) {
+    top_counter <- top_counter + 1
+  }
+}
+bot_counter = 0
+for (country in predicted_worst_countries$Location) {
+  if (country %in% bottom_10_happiest_2024) {
+    bot_counter <- bot_counter + 1
+  }
+}
+
+print(paste("Correct top 10:", top_counter, "      Correct bottom 10:", bot_counter))
+
+
+```
+
+Even using the happiness index for a single year to evaluate a score from different periods results in a good number of correctly identified best countries (which is where we intend to focus our attention), so we can say that our system works. 
+
+For a better proof of concept, we take the same idea but just using data from 2014 again.
+
+```{r}
+
+importance_probs <- importance_df |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
+importnace_probs1 <- importance_df1 |> mutate(scaled = Importance / sum(Importance)) |> arrange(desc(scaled))
+importance_probs  = importance_probs |> rename(scaled_tub = scaled)
+
+# got feature weight by doing the mean of both importnace scores from both the models for tuberculosis and infant mortality
+feat_weight = bind_cols(importance_probs |> select(Variable, scaled_tub), importnace_probs1 |> select(scaled)) |> mutate(new_weight = (scaled_tub + scaled) / (sum(scaled_tub) + sum(scaled))) |> select(Variable, new_weight)
+
+# got mean off all features by all the periods and scaled the features
+mean_featu_by_country = cleaned_countries_2014 |> group_by(Location) |> summarise(across(where(is.numeric) & !matches("Period"), ~ mean(.x, na.rm = TRUE)))
+scaled_mean_feat_country = mean_featu_by_country |> mutate(across(explanatory_feat, scale)) |> select(Location, explanatory_feat) |> mutate(across(everything(), ~ ifelse(is.nan(.), 0, .)))
+
+# did a weighted sum of all the scaled features with the weight computed
+long_data <- mean_featu_by_country |>
+  pivot_longer(cols = -Location, names_to = "Variable", values_to = "value")
+
+weighted_data <- long_data |>
+  inner_join(feat_weight, by = "Variable") |>
+  mutate(weighted_value = value * new_weight)
+
+health_risk_score <- weighted_data |>
+  group_by(Location) |>
+  summarise(score = sum(weighted_value, na.rm = TRUE))
+
+# top 10
+health_risk_score |> arrange(score) |> tail(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col(fill = "seagreen") + coord_flip()
+
+# least 10
+health_risk_score |> arrange(score) |> head(10) |> ggplot(aes(x = reorder(Location, score), y = score)) + geom_col(fill = "tomato") + coord_flip()
+
+
+# checking against WHR
+predicted_best_countries <- health_risk_score |> arrange(score) |> tail(10) |> select(Location)
+predicted_worst_countries <- health_risk_score |> arrange(score) |> head(10) |> select(Location)
+
+top_counter = 0
+for (country in predicted_best_countries$Location) {
+  if (country %in% top_10_happiest_2014) {
+    top_counter <- top_counter + 1
+  }
+}
+bot_counter = 0
+for (country in predicted_worst_countries$Location) {
+  if (country %in% bottom_10_happiest_2014) {
+    bot_counter <- bot_counter + 1
+  }
+}
+
+print(paste("Correct top 10:", top_counter, "      Correct bottom 10:", bot_counter))
+
+
+```
+### 3. Conclusion
+
+Using different models and statistical methods we were able to answer our questions finding that:
+-   The best metrics with which to judge a country's wellbeing are infant mortality rate and cases of tuberculosis;
+-   We can predict these idicators using linear regression and classification models respectively;
+-   The best countries by quality of life are also the best countries in which to raise a family, and are Finland, Monaco and Germany;
+-   Using the WHR data we can adequately, if not completely, corroborate our findings.
+
