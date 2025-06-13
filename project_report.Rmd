@@ -65,7 +65,7 @@ For one of the questions we also recovered some countries from [the World Happin
 
 We started by selecting 22 data sets that describe well-being of the people, including medical data, accessibility to infrastructure, deaths related to a selection of causes, and similar. This data was then loaded into a single table, and labeled according to whether it is a decision - also known as explanatory - feature, or an outcome feature. What is meant by this is whether a feature can be described as a decision a country makes, such as the number of medical professionals employed, whereas outcomes indicate finality, such as deaths or the number of people that ended up catching a disease. The decision variables can also be called explanatory, as they can be used to explain how an outcome came to be, for example if we were to take the case of a person going to work: the time at which they leave their house is an explanatory feature, and the time they arrive at work is an outcome, since if they arrive late it can be explained by the fact they left late.
 
-After choosing and separating the features, we have 22 columns divided into 11 outcomes and 9 explanatory features, plus the country and the year at which the data was recorded. The features initially had some values per 10 000 inhabitants and some per 100'000 or 1'000, so we adjusted all to be per 10'000 so the data is neater. The list of features and their meaning follows:
+After choosing and separating the features, we have 22 columns divided into 11 outcomes and 9 explanatory features, plus the country and the year at which the data was recorded. The features initially had some values per 10 000 inhabitants and some per 100'000 or 1'000, we normalised each to be per 10'000 for consistency. The list of features and their meaning follows:
 
 Outcome features:
 
@@ -272,7 +272,7 @@ explanatory_feat = setdiff(explanatory_feat, c("Location", "Period"))
 
 ```
 
-The size of the data table is determined by the number of countries (200) and the timespan (1962 - 2019) for a total of 11'600 rows and 22 columns. Of these, 200'000 are missing values. The missing data needs to be dealt with before any real answers can be properly explored. To minimise this issue, we looked at missing data by year and removed the worst period, keeping data only after the year 2'000, then looking at the missing values per feature and choosing to reject any features with more than a limit of 3'000 missing points, set at that number to not remove too many features and still keep the data usable. This means removing 6 features, of which 5 outcomes, so to verify that we are not losing too much information we visualised some initial correlation plots between all outcome features, verifying high values of correlation between the columns to be removed and those kept, thus ensuring not too much information is lost.
+The size of the data table is determined by the number of countries (200) and the timespan (1962 - 2019) for a total of 11'600 rows and 22 columns. Of these, almost 200'000 are missing values, which is almost 80% of the data. The missing data needs to be dealt with before any real answers can be properly explored, since it's such a huge issue. To minimise this issue, we looked at missing data by year and removed the worst period, keeping data only after the year 2000, then looking at the missing values per feature and choosing to reject any features with more than a limit of 3'000 missing points, set at that number to not remove too many features and still keep the data usable. This means removing 6 features, of which 5 outcomes, so to verify that we are not losing too much information we visualised some initial correlation plots between all outcome features, verifying high values of correlation between the columns to be removed and those kept, thus ensuring not too much information is lost.
 
 We are left with the following 16 features, divided into 6 outcome, 8 explanatory and 2 that represent the country and year of the data's recording.
 
@@ -537,7 +537,7 @@ for (feat in outcome_feat) {
   p <- ggplot(df_feat, aes(x = .data[[country_col]], y = .data[[feat]], fill = highlight)) +
     geom_bar(stat = "identity") +
     coord_flip() +
-    scale_fill_manual(values = c("In Range" = "skyblue", "Out Of Range" = "tomato")) +
+    scale_fill_manual(values = c("In Range" = "seagreen", "Out Of Range" = "tomato")) +
     labs(title = paste("Feature:", feat),
          x = "Country", y = feat) +
     theme_minimal()
@@ -549,7 +549,9 @@ for (feat in outcome_feat) {
 
 ```
 
-These plots show the countries ranked by their counts of the outcome variable, per each variable. Highlighted in blue are those countries within the minimum and maximum of the top 10 countries, in red instead are those outside.
+These plots show the countries ranked by their counts of the outcome variable, per each variable. Highlighted in blue are those countries within the minimum and maximum of the top 10 countries by happiness (in 2014), in red instead are those outside. Only the top 75 countries (by lowest mortality rates) are shown, for clarity.
+
+What we see here is countries with values outside of the range of variables of one of the happiest countries are coloured in red, whereas those that fit into the happiest countries' range are green.
 
 Having seen this graph, we conclude that our outcome variables are indeed a good metric with which to rate the countries, as it seems that the happiest countries in a given year do rank with fewer deaths compared to the other countries overall. Malaria may not be the best one, as none of the top happiest countries have a single recorded incident that year, so much so that we cannot use the information from it to evaluate other countries.
 
